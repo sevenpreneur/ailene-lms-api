@@ -1,7 +1,10 @@
 package com.ailene.lms.role;
 
 import com.ailene.lms.common.exception.ResourceNotFoundException;
+import com.ailene.lms.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,14 +20,16 @@ public class RoleController {
     private final RoleRepository roleRepository;
 
     @GetMapping
-    public List<RoleDto> findAll() {
-        return roleRepository.findAll().stream().map(RoleDto::from).toList();
+    public ResponseEntity<ApiResponse<List<RoleDto>>> findAll() {
+        List<RoleDto> roles = roleRepository.findAll().stream().map(RoleDto::from).toList();
+        return ApiResponse.success(HttpStatus.OK, "roles retrieved successfully", roles);
     }
 
     @GetMapping("/{id}")
-    public RoleDto findById(@PathVariable Short id) {
-        return roleRepository.findById(id)
+    public ResponseEntity<ApiResponse<RoleDto>> findById(@PathVariable Short id) {
+        RoleDto role = roleRepository.findById(id)
                 .map(RoleDto::from)
                 .orElseThrow(() -> new ResourceNotFoundException("Role %d not found".formatted(id)));
+        return ApiResponse.success(HttpStatus.OK, "role retrieved successfully", role);
     }
 }
