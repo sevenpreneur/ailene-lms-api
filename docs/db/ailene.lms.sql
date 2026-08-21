@@ -1,0 +1,914 @@
+-- PostgreSQL Database for Ailene LMS
+
+------------------
+-- Enumerations --
+------------------
+
+CREATE TYPE status_enum AS ENUM (
+  'active',
+  'inactive'
+);
+
+-- Enumeration for the users table
+
+CREATE TYPE occupation_enum AS ENUM (
+  'employee',
+  'entrepreneur',
+  'student',
+  'freelance',
+  'military',
+  'unemployed'
+);
+
+CREATE TYPE job_function_enum AS ENUM (
+  'bd',
+  'sales',
+  'operations',
+  'curriculum',
+  'finance',
+  'it'
+);
+
+CREATE TYPE data_scope_enum AS ENUM (
+  'own',
+  'team',
+  'global'
+);
+
+CREATE TYPE user_account_status_enum AS ENUM (
+  'invited',
+  'active',
+  'suspended',
+  'deactivated',
+  'archived'
+);
+
+-- Enumeration for the trainers table
+
+CREATE TYPE trainer_source_enum AS ENUM (
+  'ai_community',
+  'top_alumni',
+  'domain_practitioner',
+  'trainer_network',
+  'corporate_practitioner',
+  'internal_referral'
+);
+
+CREATE TYPE trainer_level_enum AS ENUM (
+  'junior',
+  'senior'
+);
+
+CREATE TYPE trainer_stage_enum AS ENUM (
+  'candidate',
+  'qualified',
+  'not_qualified',
+  'eligible',
+  'not_eligible'
+);
+
+CREATE TYPE trainer_status_enum AS ENUM (
+  'active',
+  'inactive'
+);
+
+-- Enumeration for the trainer_screenings table
+
+CREATE TYPE trnsc_status_enum AS ENUM (
+  'pending',
+  'passed',
+  'failed',
+  'skipped'
+);
+
+-- Enumeration for the trainer_certifications table
+
+CREATE TYPE trncert_status_enum AS ENUM (
+  'not_started',
+  'in_progress',
+  'passed',
+  'failed'
+);
+
+-- Enumeration for the lms_chapters table
+
+CREATE TYPE lms_chapter_method_enum AS ENUM (
+  'online',
+  'offline'
+);
+
+-- Enumeration for the lms_chapter_trainer_requests table
+
+CREATE TYPE lms_chapter_trainer_request_status_enum AS ENUM (
+  'pending',
+  'selected',
+  'rejected'
+);
+
+-- Enumeration for the lms_members table
+
+CREATE TYPE lms_role_enum AS ENUM (
+  'student',
+  'champion',
+  'sponsor'
+);
+
+-- Enumeration for the lms_xp_earnings table
+
+CREATE TYPE lms_learning_type_enum AS ENUM (
+  'quiz',
+  'video',
+  'material',
+  'use_case',
+  'prompt'
+);
+
+-- Enumeration for the lms_use_case_submissions table
+
+CREATE TYPE lms_use_case_frequency_enum AS ENUM (
+  'daily',
+  'weekly',
+  'monthly',
+  'occasionally'
+);
+
+CREATE TYPE lms_use_case_type_enum AS ENUM (
+  'workflow_automation',
+  'content_creation',
+  'data_analysis',
+  'research',
+  'communication',
+  'decision_support',
+  'learning',
+  'other'
+);
+
+-- Enumeration for the lms_pre_assessments table
+
+CREATE TYPE lms_pa_ai_use_freq_enum AS ENUM (
+  'never',
+  'tried',
+  'weekly',
+  'daily',
+  'intensive'
+);
+
+CREATE TYPE lms_pa_output_review_enum AS ENUM (
+  'no_check',
+  'sometimes',
+  'always',
+  'cross_check',
+  'no_use'
+);
+
+CREATE TYPE lms_pa_team_adoption_enum AS ENUM (
+  'none',
+  'personal',
+  'pilot',
+  'policy',
+  'integrated'
+);
+
+CREATE TYPE lms_pa_frequency_enum AS ENUM (
+  'never',
+  'rarely',
+  'sometimes',
+  'often',
+  'always'
+);
+
+CREATE TYPE lms_pa_prompt_skill_enum AS ENUM (
+  'none',
+  'basic',
+  'decent',
+  'structured',
+  'expert'
+);
+
+CREATE TYPE lms_pa_refine_scenario_enum AS ENUM (
+  'targeted',
+  'switch_tool',
+  'manual',
+  'restart'
+);
+
+CREATE TYPE lms_pa_attitude_enum AS ENUM (
+  'too_risky',
+  'cautious',
+  'neutral',
+  'supportive',
+  'essential'
+);
+
+CREATE TYPE lms_pa_motivation_enum AS ENUM (
+  'mandatory',
+  'curious',
+  'tentative',
+  'ready',
+  'eager'
+);
+
+------------
+-- Tables --
+------------
+
+-- Shared account tables
+
+CREATE TABLE phone_country_codes (
+  id            SMALLSERIAL  PRIMARY KEY,
+  country_name  VARCHAR      NOT NULL,
+  phone_code    VARCHAR      NOT NULL  UNIQUE,
+  emoji         VARCHAR      NOT NULL,
+  icon          VARCHAR          NULL
+);
+
+CREATE TABLE roles (
+  id          SMALLSERIAL  PRIMARY KEY,
+  name        VARCHAR      NOT NULL  UNIQUE,
+  permission  SMALLINT     NOT NULL,
+  created_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE teams (
+  id          SMALLSERIAL  PRIMARY KEY,
+  name        VARCHAR      NOT NULL  UNIQUE,
+  created_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE users (
+  id                UUID                       PRIMARY KEY,
+  full_name         VARCHAR                    NOT NULL,
+  email             VARCHAR                    NOT NULL  UNIQUE,
+  phone_country_id  SMALLINT                       NULL,
+  phone_number      VARCHAR                        NULL,
+  avatar            VARCHAR                        NULL,
+  role_id           SMALLINT                   NOT NULL  DEFAULT 3,
+  date_of_birth     DATE                           NULL,
+  occupation        occupation_enum                NULL,
+  created_at        TIMESTAMPTZ                NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ                NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  last_login        TIMESTAMPTZ                NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  deleted_at        TIMESTAMPTZ                    NULL,
+  team_id           SMALLINT                       NULL,
+  job_function      job_function_enum              NULL,
+  data_scope        data_scope_enum            NOT NULL  DEFAULT 'own',
+  invited_by_id     UUID                           NULL,
+  invited_at        TIMESTAMPTZ                    NULL,
+  status            user_account_status_enum   NOT NULL  DEFAULT 'active'
+);
+
+-- Trainer pipeline
+
+CREATE TABLE trainers (
+  id                    CHAR(21)              PRIMARY KEY,
+  source                trainer_source_enum       NULL,
+  level                 trainer_level_enum    NOT NULL  DEFAULT 'junior',
+  stage                 trainer_stage_enum    NOT NULL  DEFAULT 'candidate',
+  status                trainer_status_enum   NOT NULL  DEFAULT 'active',
+  user_id               UUID                  NOT NULL  UNIQUE,
+  referred_by           UUID                      NULL,
+  notes                 TEXT                      NULL,
+  ai_experience_years   SMALLINT              NOT NULL  DEFAULT 0,
+  created_at            TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  deleted_at            TIMESTAMPTZ               NULL
+);
+
+CREATE TABLE trainer_specializations (
+  id                  SMALLSERIAL  PRIMARY KEY,
+  specialization_name VARCHAR      NOT NULL  UNIQUE,
+  created_at          TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE trainer_specialization_map (
+  trainer_id        CHAR(21)  NOT NULL,
+  specialization_id SMALLINT  NOT NULL,
+  PRIMARY KEY (trainer_id, specialization_id)
+);
+
+CREATE TABLE trainer_screenings (
+  id                          SERIAL              PRIMARY KEY,
+  trainer_id                  CHAR(21)            NOT NULL  UNIQUE,
+  application_review          trnsc_status_enum   NOT NULL  DEFAULT 'pending',
+  interview                   trnsc_status_enum   NOT NULL  DEFAULT 'pending',
+  teaching_demo                trnsc_status_enum   NOT NULL  DEFAULT 'pending',
+  practical_test               trnsc_status_enum   NOT NULL  DEFAULT 'pending',
+  reference_check              trnsc_status_enum   NOT NULL  DEFAULT 'pending',
+  ai_hands_on_score            SMALLINT            NOT NULL  DEFAULT 0,
+  facilitation_score           SMALLINT            NOT NULL  DEFAULT 0,
+  domain_credibility_score     SMALLINT            NOT NULL  DEFAULT 0,
+  communication_score          SMALLINT            NOT NULL  DEFAULT 0,
+  reliability_score            SMALLINT            NOT NULL  DEFAULT 0,
+  total_score                  SMALLINT            NOT NULL  DEFAULT 0,
+  scored_by                    UUID                    NULL,
+  scored_at                    TIMESTAMPTZ             NULL,
+  created_at                   TIMESTAMPTZ         NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at                   TIMESTAMPTZ         NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE trainer_certifications (
+  id                        SERIAL                PRIMARY KEY,
+  trainer_id                CHAR(21)              NOT NULL  UNIQUE,
+  orientation               trncert_status_enum   NOT NULL  DEFAULT 'not_started',
+  material_mastery          trncert_status_enum   NOT NULL  DEFAULT 'not_started',
+  shadowing                 trncert_status_enum   NOT NULL  DEFAULT 'not_started',
+  co_training               trncert_status_enum   NOT NULL  DEFAULT 'not_started',
+  solo_observed_delivery    trncert_status_enum   NOT NULL  DEFAULT 'not_started',
+  certification_decision    trncert_status_enum   NOT NULL  DEFAULT 'not_started',
+  created_at                TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at                TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+-- LMS program structure
+
+CREATE TABLE lms_projects (
+  id             SERIAL       PRIMARY KEY,
+  name           VARCHAR      NOT NULL,
+  company_id     INTEGER          NULL,
+  created_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  attendee_pax   INTEGER          NULL,
+  pipeline_id    INTEGER      NOT NULL
+);
+
+CREATE TABLE lms_levels (
+  id            SERIAL       PRIMARY KEY,
+  level_number  SMALLINT     NOT NULL  UNIQUE,
+  name          VARCHAR      NOT NULL,
+  icon          VARCHAR          NULL,
+  min_xp        INTEGER      NOT NULL  DEFAULT 0,
+  status        status_enum  NOT NULL  DEFAULT 'active',
+  created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  project_id    INTEGER      NOT NULL
+);
+
+CREATE TABLE lms_chapters (
+  id                 SERIAL                    PRIMARY KEY,
+  level_id           INTEGER                   NOT NULL,
+  name               VARCHAR                   NOT NULL,
+  description        TEXT                          NULL,
+  session_date       TIMESTAMPTZ               NOT NULL,
+  status             status_enum               NOT NULL  DEFAULT 'active',
+  created_at         TIMESTAMPTZ               NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ               NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  trainer_id         CHAR(21)                      NULL,
+  duration_minutes   INTEGER                   NOT NULL,
+  location_name      VARCHAR                   NOT NULL,
+  location_url       VARCHAR                   NOT NULL,
+  method             lms_chapter_method_enum   NOT NULL  DEFAULT 'offline'
+);
+
+CREATE TABLE lms_chapter_trainer_requests (
+  id           SERIAL                                     PRIMARY KEY,
+  chapter_id   INTEGER                                     NOT NULL,
+  trainer_id   CHAR(21)                                    NOT NULL,
+  status       lms_chapter_trainer_request_status_enum     NOT NULL  DEFAULT 'pending',
+  reviewed_by  UUID                                            NULL,
+  reviewed_at  TIMESTAMPTZ                                     NULL,
+  created_at   TIMESTAMPTZ                                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ                                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (chapter_id, trainer_id)
+);
+
+-- LMS content
+
+CREATE TABLE lms_materials (
+  id           VARCHAR      PRIMARY KEY,
+  chapter_id   INTEGER      NOT NULL,
+  title        VARCHAR      NOT NULL,
+  description  TEXT             NULL,
+  content      TEXT             NULL,
+  file_url     TEXT             NULL,
+  image_url    TEXT             NULL,
+  xp_reward    SMALLINT     NOT NULL  DEFAULT 0,
+  order_index  SMALLINT     NOT NULL  DEFAULT 0,
+  status       status_enum  NOT NULL  DEFAULT 'active',
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_videos (
+  id           SERIAL       PRIMARY KEY,
+  chapter_id   INTEGER      NOT NULL,
+  title        VARCHAR      NOT NULL,
+  description  TEXT             NULL,
+  video_url    TEXT         NOT NULL,
+  xp_reward    SMALLINT     NOT NULL  DEFAULT 0,
+  order_index  SMALLINT     NOT NULL  DEFAULT 0,
+  status       status_enum  NOT NULL  DEFAULT 'active',
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_quizzes (
+  id           VARCHAR      PRIMARY KEY,
+  chapter_id   INTEGER      NOT NULL,
+  name         VARCHAR      NOT NULL,
+  description  TEXT             NULL,
+  order_index  SMALLINT     NOT NULL  DEFAULT 0,
+  status       status_enum  NOT NULL  DEFAULT 'active',
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_quiz_questions (
+  id           SERIAL       PRIMARY KEY,
+  quiz_id      VARCHAR      NOT NULL,
+  question     TEXT         NOT NULL,
+  explanation  TEXT             NULL,
+  order_index  SMALLINT     NOT NULL  DEFAULT 0,
+  xp_reward    SMALLINT     NOT NULL  DEFAULT 0,
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_quiz_options (
+  id           SERIAL   PRIMARY KEY,
+  question_id  INTEGER  NOT NULL,
+  option_code  VARCHAR  NOT NULL,
+  text         VARCHAR  NOT NULL,
+  is_correct   BOOLEAN  NOT NULL  DEFAULT FALSE
+);
+
+-- LMS categories, prompts & use cases
+
+CREATE TABLE lms_categories (
+  id    SMALLSERIAL  PRIMARY KEY,
+  name  VARCHAR      NOT NULL  UNIQUE
+);
+
+CREATE TABLE lms_prompts (
+  id               SERIAL       PRIMARY KEY,
+  level_id         INTEGER      NOT NULL,
+  name             VARCHAR      NOT NULL,
+  scenario         TEXT         NOT NULL,
+  expected_output  TEXT         NOT NULL,
+  xp_reward        SMALLINT     NOT NULL  DEFAULT 70,
+  status           status_enum  NOT NULL  DEFAULT 'active',
+  is_self_created  BOOLEAN      NOT NULL  DEFAULT FALSE,
+  created_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_prompt_categories (
+  prompt_id    INTEGER   NOT NULL,
+  category_id  SMALLINT  NOT NULL,
+  PRIMARY KEY (prompt_id, category_id)
+);
+
+CREATE TABLE lms_use_cases (
+  id               SERIAL       PRIMARY KEY,
+  level_id         INTEGER      NOT NULL,
+  name             VARCHAR      NOT NULL,
+  description      TEXT         NOT NULL,
+  xp_reward        SMALLINT     NOT NULL  DEFAULT 70,
+  status           status_enum  NOT NULL  DEFAULT 'active',
+  is_self_created  BOOLEAN      NOT NULL  DEFAULT FALSE,
+  created_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_use_case_categories (
+  use_case_id  INTEGER   NOT NULL,
+  category_id  SMALLINT  NOT NULL,
+  PRIMARY KEY (use_case_id, category_id)
+);
+
+-- LMS members & progress
+--
+-- Note: user_id, group_id and current_level_id are plain columns in the live
+-- database -- no FK constraints are defined for this table, so they are left
+-- unenforced here too (see the References section).
+
+CREATE TABLE lms_members (
+  id                SERIAL         PRIMARY KEY,
+  user_id           UUID           NOT NULL  UNIQUE,
+  role              lms_role_enum  NOT NULL,
+  job_title         VARCHAR        NOT NULL,
+  group_id          INTEGER            NULL,
+  current_level_id  INTEGER        NOT NULL  DEFAULT 0,
+  level_history     JSONB          NOT NULL  DEFAULT '[]',
+  last_active_at    TIMESTAMPTZ        NULL,
+  created_at        TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_groups (
+  id           SERIAL       PRIMARY KEY,
+  name         VARCHAR      NOT NULL,
+  project_id   INTEGER      NOT NULL,
+  champion_id  INTEGER      NOT NULL,
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_coaching_notes (
+  id           SERIAL       PRIMARY KEY,
+  member_id    INTEGER      NOT NULL,
+  champion_id  INTEGER      NOT NULL,
+  text         TEXT         NOT NULL,
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_material_completions (
+  member_id     INTEGER      NOT NULL,
+  material_id   VARCHAR      NOT NULL,
+  completed_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (member_id, material_id)
+);
+
+CREATE TABLE lms_video_completions (
+  member_id     INTEGER      NOT NULL,
+  video_id      INTEGER      NOT NULL,
+  completed_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (member_id, video_id)
+);
+
+CREATE TABLE lms_quiz_submissions (
+  id               SERIAL       PRIMARY KEY,
+  member_id        INTEGER      NOT NULL,
+  quiz_id          VARCHAR      NOT NULL,
+  attempt_number   SMALLINT     NOT NULL,
+  answers          JSONB        NOT NULL,
+  score            SMALLINT     NOT NULL,
+  is_completed     BOOLEAN      NOT NULL  DEFAULT FALSE,
+  started_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  submitted_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (member_id, quiz_id, attempt_number)
+);
+
+CREATE TABLE lms_prompt_submissions (
+  id                    SERIAL       PRIMARY KEY,
+  member_id             INTEGER      NOT NULL,
+  prompt_id             INTEGER      NOT NULL,
+  assigned_by_id        INTEGER          NULL,
+  deadline              TIMESTAMPTZ      NULL,
+  message               TEXT             NULL,
+  input                 TEXT             NULL,
+  output                TEXT             NULL,
+  submitted_at          TIMESTAMPTZ      NULL,
+  reviewed_by_id        INTEGER          NULL,
+  reviewed_at           TIMESTAMPTZ      NULL,
+  comment               TEXT             NULL,
+  is_accepted           BOOLEAN      NOT NULL  DEFAULT FALSE,
+  rubric_specificity    SMALLINT         NULL,
+  rubric_context        SMALLINT         NULL,
+  rubric_constraints    SMALLINT         NULL,
+  rubric_examples       SMALLINT         NULL,
+  rubric_iteration      SMALLINT         NULL,
+  created_at            TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (member_id, prompt_id)
+);
+
+CREATE TABLE lms_use_case_submissions (
+  id                SERIAL                        PRIMARY KEY,
+  member_id         INTEGER                       NOT NULL,
+  use_case_id       INTEGER                       NOT NULL,
+  assigned_by_id    INTEGER                           NULL,
+  deadline          TIMESTAMPTZ                       NULL,
+  message           TEXT                              NULL,
+  outcome_proof     VARCHAR                           NULL,
+  hours_with_ai     NUMERIC(6,2)                      NULL,
+  hours_without_ai  NUMERIC(6,2)                      NULL,
+  description       TEXT                              NULL,
+  ai_tool           VARCHAR                           NULL,
+  frequency         lms_use_case_frequency_enum       NULL,
+  type              lms_use_case_type_enum            NULL,
+  submitted_at      TIMESTAMPTZ                       NULL,
+  reviewed_by_id    INTEGER                           NULL,
+  reviewed_at       TIMESTAMPTZ                       NULL,
+  comment           TEXT                              NULL,
+  is_accepted       BOOLEAN                       NOT NULL  DEFAULT FALSE,
+  created_at        TIMESTAMPTZ                   NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ                   NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (member_id, use_case_id)
+);
+
+CREATE TABLE lms_xp_earnings (
+  id             SERIAL                   PRIMARY KEY,
+  member_id      INTEGER                  NOT NULL,
+  learning_type  lms_learning_type_enum   NOT NULL,
+  learning_id    VARCHAR                  NOT NULL,
+  xp_earned      SMALLINT                 NOT NULL,
+  earned_at      TIMESTAMPTZ              NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (member_id, learning_type, learning_id)
+);
+
+-- LMS pre-assessment
+
+CREATE TABLE lms_pre_assessments (
+  id                      SERIAL                          PRIMARY KEY,
+  member_id               INTEGER                         NOT NULL  UNIQUE,
+  ai_use_frequency        lms_pa_ai_use_freq_enum          NOT NULL,
+  ai_tools_used           TEXT[]                               NULL,
+  ai_limitations          TEXT[]                               NULL,
+  output_review           lms_pa_output_review_enum       NOT NULL,
+  use_cases               TEXT[]                               NULL,
+  team_adoption           lms_pa_team_adoption_enum       NOT NULL,
+  concrete_example        VARCHAR                              NULL,
+  model_selection         lms_pa_frequency_enum           NOT NULL,
+  multimodal_use          lms_pa_frequency_enum           NOT NULL,
+  workflow_reuse          lms_pa_frequency_enum           NOT NULL,
+  prompt_comfort          lms_pa_prompt_skill_enum        NOT NULL,
+  prompt_iteration        lms_pa_frequency_enum           NOT NULL,
+  refine_scenario         lms_pa_refine_scenario_enum     NOT NULL,
+  professional_attitude   lms_pa_attitude_enum            NOT NULL,
+  data_safety_check       lms_pa_frequency_enum           NOT NULL,
+  publish_unchecked       lms_pa_frequency_enum           NOT NULL,
+  biggest_challenge       TEXT                            NOT NULL,
+  training_expectation    TEXT                            NOT NULL,
+  motivation              lms_pa_motivation_enum          NOT NULL,
+  created_at              TIMESTAMPTZ                     NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_pre_assessment_reports (
+  id                  SERIAL       PRIMARY KEY,
+  pre_assessment_id   INTEGER      NOT NULL  UNIQUE,
+  status              VARCHAR      NOT NULL  DEFAULT 'pending',
+  recommendations     JSONB            NULL,
+  error_message       TEXT             NULL,
+  queued_at           TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  generated_at        TIMESTAMPTZ      NULL,
+  updated_at          TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+-- LMS misc
+
+CREATE TABLE lms_announcement (
+  id          SERIAL       PRIMARY KEY,
+  title       VARCHAR      NOT NULL,
+  callout     VARCHAR          NULL,
+  status      status_enum  NOT NULL,
+  start_date  TIMESTAMPTZ  NOT NULL,
+  end_date    TIMESTAMPTZ  NOT NULL,
+  updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+----------------
+-- References --
+----------------
+
+-- Shared account tables
+
+ALTER TABLE users
+  ADD FOREIGN KEY (phone_country_id) REFERENCES phone_country_codes (id),
+  ADD FOREIGN KEY (role_id)          REFERENCES roles (id),
+  ADD FOREIGN KEY (team_id)          REFERENCES teams (id),
+  ADD FOREIGN KEY (invited_by_id)    REFERENCES users (id);
+
+-- Trainer pipeline
+
+ALTER TABLE trainers
+  ADD FOREIGN KEY (user_id)     REFERENCES users (id),
+  ADD FOREIGN KEY (referred_by) REFERENCES users (id);
+
+ALTER TABLE trainer_specialization_map
+  ADD FOREIGN KEY (trainer_id)        REFERENCES trainers (id),
+  ADD FOREIGN KEY (specialization_id) REFERENCES trainer_specializations (id);
+
+ALTER TABLE trainer_screenings
+  ADD FOREIGN KEY (trainer_id) REFERENCES trainers (id),
+  ADD FOREIGN KEY (scored_by)  REFERENCES users (id);
+
+ALTER TABLE trainer_certifications
+  ADD FOREIGN KEY (trainer_id) REFERENCES trainers (id);
+
+-- LMS program structure
+
+-- lms_projects.company_id and lms_projects.pipeline_id point at b2b_company
+-- and b2b_pipeline, which live in the CRM module and are not defined in this
+-- file. The constraints are listed here to document the relationship, but
+-- only apply once that module's tables exist in the same database.
+ALTER TABLE lms_projects
+  ADD FOREIGN KEY (company_id)  REFERENCES b2b_company (id),
+  ADD FOREIGN KEY (pipeline_id) REFERENCES b2b_pipeline (id);
+
+ALTER TABLE lms_levels
+  ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
+
+ALTER TABLE lms_chapters
+  ADD FOREIGN KEY (level_id)   REFERENCES lms_levels (id),
+  ADD FOREIGN KEY (trainer_id) REFERENCES trainers (id);
+
+ALTER TABLE lms_chapter_trainer_requests
+  ADD FOREIGN KEY (chapter_id)  REFERENCES lms_chapters (id),
+  ADD FOREIGN KEY (trainer_id)  REFERENCES trainers (id),
+  ADD FOREIGN KEY (reviewed_by) REFERENCES users (id);
+
+-- LMS content
+
+ALTER TABLE lms_materials
+  ADD FOREIGN KEY (chapter_id) REFERENCES lms_chapters (id);
+
+ALTER TABLE lms_videos
+  ADD FOREIGN KEY (chapter_id) REFERENCES lms_chapters (id);
+
+ALTER TABLE lms_quizzes
+  ADD FOREIGN KEY (chapter_id) REFERENCES lms_chapters (id);
+
+ALTER TABLE lms_quiz_questions
+  ADD FOREIGN KEY (quiz_id) REFERENCES lms_quizzes (id);
+
+ALTER TABLE lms_quiz_options
+  ADD FOREIGN KEY (question_id) REFERENCES lms_quiz_questions (id);
+
+-- LMS categories, prompts & use cases
+
+ALTER TABLE lms_prompts
+  ADD FOREIGN KEY (level_id) REFERENCES lms_levels (id);
+
+ALTER TABLE lms_prompt_categories
+  ADD FOREIGN KEY (prompt_id)   REFERENCES lms_prompts (id),
+  ADD FOREIGN KEY (category_id) REFERENCES lms_categories (id);
+
+ALTER TABLE lms_use_cases
+  ADD FOREIGN KEY (level_id) REFERENCES lms_levels (id);
+
+ALTER TABLE lms_use_case_categories
+  ADD FOREIGN KEY (use_case_id) REFERENCES lms_use_cases (id),
+  ADD FOREIGN KEY (category_id) REFERENCES lms_categories (id);
+
+-- LMS members & progress
+
+ALTER TABLE lms_groups
+  ADD FOREIGN KEY (project_id)  REFERENCES lms_projects (id),
+  ADD FOREIGN KEY (champion_id) REFERENCES lms_members (id);
+
+ALTER TABLE lms_coaching_notes
+  ADD FOREIGN KEY (member_id)    REFERENCES lms_members (id),
+  ADD FOREIGN KEY (champion_id)  REFERENCES lms_members (id);
+
+ALTER TABLE lms_material_completions
+  ADD FOREIGN KEY (member_id)   REFERENCES lms_members (id),
+  ADD FOREIGN KEY (material_id) REFERENCES lms_materials (id);
+
+ALTER TABLE lms_video_completions
+  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id),
+  ADD FOREIGN KEY (video_id)  REFERENCES lms_videos (id);
+
+ALTER TABLE lms_quiz_submissions
+  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id),
+  ADD FOREIGN KEY (quiz_id)   REFERENCES lms_quizzes (id);
+
+ALTER TABLE lms_prompt_submissions
+  ADD FOREIGN KEY (member_id)      REFERENCES lms_members (id),
+  ADD FOREIGN KEY (prompt_id)      REFERENCES lms_prompts (id),
+  ADD FOREIGN KEY (assigned_by_id) REFERENCES lms_members (id),
+  ADD FOREIGN KEY (reviewed_by_id) REFERENCES lms_members (id);
+
+ALTER TABLE lms_use_case_submissions
+  ADD FOREIGN KEY (member_id)      REFERENCES lms_members (id),
+  ADD FOREIGN KEY (use_case_id)    REFERENCES lms_use_cases (id),
+  ADD FOREIGN KEY (assigned_by_id) REFERENCES lms_members (id),
+  ADD FOREIGN KEY (reviewed_by_id) REFERENCES lms_members (id);
+
+ALTER TABLE lms_xp_earnings
+  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id);
+
+-- LMS pre-assessment
+
+ALTER TABLE lms_pre_assessments
+  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id);
+
+ALTER TABLE lms_pre_assessment_reports
+  ADD FOREIGN KEY (pre_assessment_id) REFERENCES lms_pre_assessments (id);
+
+---------------
+-- Functions --
+---------------
+
+CREATE OR REPLACE FUNCTION update_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.updated_at := CURRENT_TIMESTAMP;
+    RETURN NEW;
+  END;
+$$ LANGUAGE plpgsql;
+
+--------------
+-- Triggers --
+--------------
+
+-- Shared account tables
+
+CREATE TRIGGER update_roles_updated_at_trigger
+  BEFORE UPDATE ON roles
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_teams_updated_at_trigger
+  BEFORE UPDATE ON teams
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_users_updated_at_trigger
+  BEFORE UPDATE ON users
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- Trainer pipeline
+
+CREATE TRIGGER update_trainers_updated_at_trigger
+  BEFORE UPDATE ON trainers
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_trainer_screenings_updated_at_trigger
+  BEFORE UPDATE ON trainer_screenings
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_trainer_certifications_updated_at_trigger
+  BEFORE UPDATE ON trainer_certifications
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- LMS program structure
+
+CREATE TRIGGER update_lms_projects_updated_at_trigger
+  BEFORE UPDATE ON lms_projects
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_levels_updated_at_trigger
+  BEFORE UPDATE ON lms_levels
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_chapters_updated_at_trigger
+  BEFORE UPDATE ON lms_chapters
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_chapter_trainer_requests_updated_at_trigger
+  BEFORE UPDATE ON lms_chapter_trainer_requests
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- LMS content
+
+CREATE TRIGGER update_lms_materials_updated_at_trigger
+  BEFORE UPDATE ON lms_materials
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_videos_updated_at_trigger
+  BEFORE UPDATE ON lms_videos
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_quizzes_updated_at_trigger
+  BEFORE UPDATE ON lms_quizzes
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_quiz_questions_updated_at_trigger
+  BEFORE UPDATE ON lms_quiz_questions
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- LMS categories, prompts & use cases
+
+CREATE TRIGGER update_lms_prompts_updated_at_trigger
+  BEFORE UPDATE ON lms_prompts
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_use_cases_updated_at_trigger
+  BEFORE UPDATE ON lms_use_cases
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- LMS members & progress
+
+CREATE TRIGGER update_lms_groups_updated_at_trigger
+  BEFORE UPDATE ON lms_groups
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_prompt_submissions_updated_at_trigger
+  BEFORE UPDATE ON lms_prompt_submissions
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_use_case_submissions_updated_at_trigger
+  BEFORE UPDATE ON lms_use_case_submissions
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- LMS pre-assessment
+
+CREATE TRIGGER update_lms_pre_assessment_reports_updated_at_trigger
+  BEFORE UPDATE ON lms_pre_assessment_reports
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- LMS misc
+
+CREATE TRIGGER update_lms_announcement_updated_at_trigger
+  BEFORE UPDATE ON lms_announcement
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
