@@ -1,7 +1,0 @@
-target/
-.git/
-.github/
-.vscode/
-.idea/
-*.md
-.env
