@@ -1,40 +1,33 @@
 package com.ailene.lms.auth;
 
 import com.ailene.lms.common.exception.UnauthorizedException;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.security.GeneralSecurityException;
-import java.util.Collections;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Component
 public class GoogleTokenVerifier {
 
-    private final GoogleIdTokenVerifier verifier;
+    private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
 
-    public GoogleTokenVerifier(@Value("${google.oauth.client-id}") String clientId) {
-        this.verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                .setAudience(Collections.singletonList(clientId))
-                .build();
-    }
+    private final RestClient restClient = RestClient.create();
 
-    public GoogleIdToken.Payload verify(String idTokenString) {
-        GoogleIdToken idToken;
+    public GoogleUserInfo verify(String accessToken) {
+        GoogleUserInfo userInfo;
         try {
-            idToken = verifier.verify(idTokenString);
-        } catch (GeneralSecurityException | IOException | IllegalArgumentException e) {
-            throw new UnauthorizedException("Failed to verify Google ID token");
+            userInfo = restClient.get()
+                    .uri(USERINFO_URL)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .retrieve()
+                    .body(GoogleUserInfo.class);
+        } catch (RestClientException e) {
+            throw new UnauthorizedException("Failed to verify Google access token");
         }
 
-        if (idToken == null || !Boolean.TRUE.equals(idToken.getPayload().getEmailVerified())) {
-            throw new UnauthorizedException("Invalid or unverified Google ID token");
+        if (userInfo == null || !Boolean.TRUE.equals(userInfo.emailVerified())) {
+            throw new UnauthorizedException("Invalid or unverified Google access token");
         }
 
-        return idToken.getPayload();
+        return userInfo;
     }
 }

@@ -21,7 +21,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Value("${security.bearer-token}")
+    @Value("${security.secret-key}")
     private String bearerToken;
 
     @PostMapping("/login/google")

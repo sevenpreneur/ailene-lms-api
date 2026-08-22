@@ -8,7 +8,7 @@ Ailene LMS backend: a Spring Boot REST API for the LMS module of a larger Neon P
 
 ## Stack
 
-Java 21, Spring Boot 4.1.0 (`spring-boot-starter-web`, `spring-boot-starter-data-jpa`, `spring-boot-starter-validation`, `spring-boot-starter-actuator`), PostgreSQL (Neon), Flyway (`spring-boot-flyway`/`flyway-core`/`flyway-database-postgresql`, wired up but not yet used — see Database), Lombok. Maven (`./mvnw`). Module/artifact name: `lms`.
+Java 21, Spring Boot 4.1.0 (`spring-boot-starter-web`, `spring-boot-starter-data-jpa`, `spring-boot-starter-validation`, `spring-boot-starter-actuator`), PostgreSQL (Neon), Flyway (`spring-boot-flyway`/`flyway-core`/`flyway-database-postgresql`, wired up but not yet used — see Database), `jjwt` (`jjwt-api`/`jjwt-impl`/`jjwt-jackson`) for the session JWT, Lombok. Maven (`./mvnw`). Module/artifact name: `lms`.
 
 ## Running locally
 
@@ -24,14 +24,14 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 |---|---|
 | `role` | `Role` entity + read-only `/api/roles` endpoints (`RoleController`, `RoleDto`, `RoleRepository`) |
 | `user` | `User`/`UserRole` entity + `UserDto`/`UserRepository` — the LMS's own user profile, no endpoints of its own yet (consumed by `auth`) |
-| `auth` | Google login (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleLoginRequest`, `AuthLoginResponse`) and its `Token`/`TokenRepository` |
+| `auth` | Google login (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleUserInfo`, `JwtService`, `GoogleLoginRequest`, `AuthLoginResponse`) and its `Token`/`TokenRepository` |
 | `common.response` | `ApiResponse<T>` envelope, `StatusName` |
 | `common.exception` | `GlobalExceptionHandler`, sentinel exception classes |
 
 ## Conventions — follow these exactly, they're load-bearing
 
 - **Response envelope:** always return `ApiResponse.success(HttpStatus, message, data)` or `ApiResponse.error(HttpStatus, message)` from `common.response`, wrapped in `ResponseEntity` — never build a `ResponseEntity` or return a raw body directly. `StatusName.fromCode()` must stay in sync with every `HttpStatus` actually used.
-- **JSON is snake_case** (`spring.jackson.property-naming-strategy: SNAKE_CASE` in `application.yaml`), matching the DB's column naming — Java fields stay camelCase (`fullName`), Jackson converts both ways at the boundary, so DTOs never need `@JsonProperty`. One quirk: `@Valid` field-validation error messages (`GlobalExceptionHandler.handleValidation`) report the Java property name, not the JSON one — e.g. sending a blank `id_token` comes back as `"idToken: must not be blank"`, not `"id_token: ..."`. Don't try to "fix" that by renaming the Java field; it's a Bean Validation limitation, not a bug.
+- **JSON is snake_case** (`spring.jackson.property-naming-strategy: SNAKE_CASE` in `application.yaml`), matching the DB's column naming — Java fields stay camelCase (`fullName`), Jackson converts both ways at the boundary, so DTOs never need `@JsonProperty`. That global config only applies to Spring MVC's own request/response bodies, though — a manually-built `RestClient` (see the note below) does not inherit it, so `auth.GoogleUserInfo` uses an explicit `@JsonProperty("email_verified")` instead of relying on the strategy. One quirk: `@Valid` field-validation error messages (`GlobalExceptionHandler.handleValidation`) report the Java property name, not the JSON one — e.g. sending a blank `access_token` comes back as `"accessToken: must not be blank"`, not `"access_token: ..."`. Don't try to "fix" that by renaming the Java field; it's a Bean Validation limitation, not a bug.
 - **Errors:** declare exception types under `common.exception` and register a handler in `GlobalExceptionHandler` (`@RestControllerAdvice`) that maps it to `ApiResponse.error(...)`. The catch-all `Exception` handler must never leak raw exception text — keep it a generic message.
 - **DTOs are records with a `public static from(Entity)` factory** — see `RoleDto`/`UserDto`. Controllers return DTOs, never JPA entities directly. Keep the factory `public` even though the DTO usually shares a package with its entity: some DTOs are consumed from another feature package too (`auth.AuthLoginResponse` wraps `user.UserDto`), and package-private would break that.
 - **Entities:** Lombok `@Getter`/`@Setter`, explicit `@Column(name = "snake_case")`, `OffsetDateTime` for `TIMESTAMPTZ` columns. Match the live column type exactly (e.g. `CHAR(21)` nanoid-style ids are `String`, not a numeric type). Postgres native enum columns use `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`, and the Java enum constants must be spelled exactly like the Postgres labels (lowercase, e.g. `UserRole.student`) since Hibernate matches by `name()`.
@@ -39,6 +39,7 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 - **Comments:** one line, no multi-line comment blocks. If it needs more than one line, it needs a shorter explanation instead.
 - **API docs live in `docs/<area>.md`** (e.g. `docs/auth.md`), one file per feature area, not per controller class. Format: one intro paragraph, then per endpoint a one-sentence description, `**Authorization:**` line, request as a JSON block + Field/Type/Required table, response as a JSON block (no field table) with any non-obvious fields explained in a paragraph after it, and an `**Errors**` table (`Code | Status | Message | When`) plus one example error response. Update the relevant doc whenever a controller's request/response shape or error cases change.
 - **`.env` loading is intentionally not SPI-based.** `me.paulschwarz:spring-dotenv` and a hand-rolled `EnvironmentPostProcessor` (both registered via `META-INF`) were tried first and silently never got invoked on this Spring Boot version — instead `LmsApplication` loads `.env` in a `static {}` block before `main()` calls `SpringApplication.run()`. That block does **not** fire for `@SpringBootTest`, because Spring only reads `LmsApplication`'s bytecode metadata there and never actually loads the class — so `LmsApplicationTests` has its own `static {}` block calling the same package-private `LmsApplication.loadDotenv()`. Any other test class that needs `.env` (e.g. a future `@SpringBootTest`) needs that same static block copied in, since it isn't inherited automatically.
+- **This Spring Boot version doesn't auto-configure a `RestClient.Builder` bean** either (`spring-boot-starter-web` alone isn't enough — injecting `RestClient.Builder` fails app startup with "no qualifying bean"). `auth.GoogleTokenVerifier` builds its `RestClient` with the static `RestClient.create()` instead. If you add another outbound HTTP call, do the same rather than assuming DI will provide a pre-configured builder.
 
 ## Database
 
@@ -49,5 +50,5 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 ## Known gaps
 
 - No automated tests beyond the Spring context-load placeholder. No CI config in this repo.
-- Auth so far is just Google ID token login issuing an opaque `lms_tokens` row (`AuthController`/`AuthService`) — nothing validates that token on subsequent requests yet, so every other endpoint is still effectively open. The login endpoint itself is gated by a single shared `SECRET_KEY` (same value for every client) — it stops randoms from hitting the endpoint, it isn't per-client auth.
+- Auth so far is just Google login: verify a Google access token via `userinfo`, then issue our own HS256 JWT (signed with `SECRET_KEY`) stored in `lms_tokens` (`AuthController`/`AuthService`) — nothing validates that JWT on subsequent requests yet, so every other endpoint is still effectively open. The login endpoint itself is gated by that same shared `SECRET_KEY` as a static bearer token (same value for every client) — it stops randoms from hitting the endpoint, it isn't per-client auth. `SECRET_KEY` is deliberately dual-purpose (bearer-token gate + JWT signing key), not two separate secrets.
 - Flyway is a dependency but unused in practice (see Database) — this is a real gap, not a deliberate choice.

@@ -4,48 +4,40 @@ import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.user.User;
 import com.ailene.lms.user.UserDto;
 import com.ailene.lms.user.UserRepository;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.OffsetDateTime;
-import java.util.Base64;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final JwtService jwtService;
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
-    private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
     public AuthLoginResponse loginWithGoogle(GoogleLoginRequest request) {
-        GoogleIdToken.Payload payload = googleTokenVerifier.verify(request.idToken());
-        String email = payload.getEmail();
+        GoogleUserInfo userInfo = googleTokenVerifier.verify(request.accessToken());
 
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(userInfo.email())
                 .orElseThrow(() -> new ForbiddenException("This Google account is not registered as an LMS user"));
 
-        user.setAvatar((String) payload.get("picture"));
+        user.setAvatar(userInfo.picture());
         user.setLastActiveAt(OffsetDateTime.now());
         userRepository.save(user);
 
+        String jwt = jwtService.issue(user);
+
         Token token = new Token();
         token.setUserId(user.getId());
-        token.setToken(generateToken());
+        token.setToken(jwt);
         token.setActive(true);
         tokenRepository.save(token);
 
-        return new AuthLoginResponse(token.getToken(), UserDto.from(user));
-    }
-
-    private String generateToken() {
-        byte[] bytes = new byte[32];
-        secureRandom.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return new AuthLoginResponse(jwt, UserDto.from(user));
     }
 }

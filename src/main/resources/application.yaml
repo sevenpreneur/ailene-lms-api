@@ -26,7 +26,7 @@ google:
     client-id: ${GOOGLE_OAUTH_ID}
 
 security:
-  bearer-token: ${SECRET_KEY}
+  secret-key: ${SECRET_KEY}
 
 management:
   endpoints:
