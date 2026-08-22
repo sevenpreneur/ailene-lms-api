@@ -9,40 +9,6 @@ CREATE TYPE status_enum AS ENUM (
   'inactive'
 );
 
--- Enumeration for the users table
-
-CREATE TYPE occupation_enum AS ENUM (
-  'employee',
-  'entrepreneur',
-  'student',
-  'freelance',
-  'military',
-  'unemployed'
-);
-
-CREATE TYPE job_function_enum AS ENUM (
-  'bd',
-  'sales',
-  'operations',
-  'curriculum',
-  'finance',
-  'it'
-);
-
-CREATE TYPE data_scope_enum AS ENUM (
-  'own',
-  'team',
-  'global'
-);
-
-CREATE TYPE user_account_status_enum AS ENUM (
-  'invited',
-  'active',
-  'suspended',
-  'deactivated',
-  'archived'
-);
-
 -- Enumeration for the trainers table
 
 CREATE TYPE trainer_source_enum AS ENUM (
@@ -105,7 +71,7 @@ CREATE TYPE lms_chapter_trainer_request_status_enum AS ENUM (
   'rejected'
 );
 
--- Enumeration for the lms_members table
+-- Enumeration for the lms_users table
 
 CREATE TYPE lms_role_enum AS ENUM (
   'student',
@@ -212,54 +178,9 @@ CREATE TYPE lms_pa_motivation_enum AS ENUM (
 -- Tables --
 ------------
 
--- Shared account tables
-
-CREATE TABLE phone_country_codes (
-  id            SMALLSERIAL  PRIMARY KEY,
-  country_name  VARCHAR      NOT NULL,
-  phone_code    VARCHAR      NOT NULL  UNIQUE,
-  emoji         VARCHAR      NOT NULL,
-  icon          VARCHAR          NULL
-);
-
-CREATE TABLE roles (
-  id          SMALLSERIAL  PRIMARY KEY,
-  name        VARCHAR      NOT NULL  UNIQUE,
-  permission  SMALLINT     NOT NULL,
-  created_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE teams (
-  id          SMALLSERIAL  PRIMARY KEY,
-  name        VARCHAR      NOT NULL  UNIQUE,
-  created_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE users (
-  id                UUID                       PRIMARY KEY,
-  full_name         VARCHAR                    NOT NULL,
-  email             VARCHAR                    NOT NULL  UNIQUE,
-  phone_country_id  SMALLINT                       NULL,
-  phone_number      VARCHAR                        NULL,
-  avatar            VARCHAR                        NULL,
-  role_id           SMALLINT                   NOT NULL  DEFAULT 3,
-  date_of_birth     DATE                           NULL,
-  occupation        occupation_enum                NULL,
-  created_at        TIMESTAMPTZ                NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at        TIMESTAMPTZ                NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  last_login        TIMESTAMPTZ                NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  deleted_at        TIMESTAMPTZ                    NULL,
-  team_id           SMALLINT                       NULL,
-  job_function      job_function_enum              NULL,
-  data_scope        data_scope_enum            NOT NULL  DEFAULT 'own',
-  invited_by_id     UUID                           NULL,
-  invited_at        TIMESTAMPTZ                    NULL,
-  status            user_account_status_enum   NOT NULL  DEFAULT 'active'
-);
-
 -- Trainer pipeline
+--
+-- user_id, referred_by, scored_by and reviewed_by all point at `users`, owned by a separate account/identity service and not defined in this file.
 
 CREATE TABLE trainers (
   id                    CHAR(21)              PRIMARY KEY,
@@ -477,50 +398,46 @@ CREATE TABLE lms_use_case_categories (
   PRIMARY KEY (use_case_id, category_id)
 );
 
--- LMS members & progress
---
--- Note: user_id, group_id and current_level_id are plain columns in the live
--- database -- no FK constraints are defined for this table, so they are left
--- unenforced here too (see the References section).
+-- LMS users & progress
 
-CREATE TABLE lms_members (
-  id                SERIAL         PRIMARY KEY,
-  user_id           UUID           NOT NULL  UNIQUE,
-  role              lms_role_enum  NOT NULL,
-  job_title         VARCHAR        NOT NULL,
-  group_id          INTEGER            NULL,
-  current_level_id  INTEGER        NOT NULL  DEFAULT 0,
-  level_history     JSONB          NOT NULL  DEFAULT '[]',
-  last_active_at    TIMESTAMPTZ        NULL,
-  created_at        TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE lms_users (
+  id              UUID           PRIMARY KEY,
+  full_name       VARCHAR        NOT NULL,
+  email           VARCHAR        NOT NULL  UNIQUE,
+  avatar          VARCHAR            NULL,
+  role            lms_role_enum  NOT NULL,
+  job_title       VARCHAR        NOT NULL,
+  last_active_at  TIMESTAMPTZ        NULL,
+  created_at      TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE lms_groups (
   id           SERIAL       PRIMARY KEY,
   name         VARCHAR      NOT NULL,
   project_id   INTEGER      NOT NULL,
-  champion_id  INTEGER      NOT NULL,
+  champion_id  UUID         NOT NULL,
   created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE lms_coaching_notes (
   id           SERIAL       PRIMARY KEY,
-  member_id    INTEGER      NOT NULL,
-  champion_id  INTEGER      NOT NULL,
+  member_id    UUID         NOT NULL,
+  champion_id  UUID         NOT NULL,
   text         TEXT         NOT NULL,
   created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE lms_material_completions (
-  member_id     INTEGER      NOT NULL,
+  member_id     UUID         NOT NULL,
   material_id   VARCHAR      NOT NULL,
   completed_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (member_id, material_id)
 );
 
 CREATE TABLE lms_video_completions (
-  member_id     INTEGER      NOT NULL,
+  member_id     UUID         NOT NULL,
   video_id      INTEGER      NOT NULL,
   completed_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (member_id, video_id)
@@ -528,7 +445,7 @@ CREATE TABLE lms_video_completions (
 
 CREATE TABLE lms_quiz_submissions (
   id               SERIAL       PRIMARY KEY,
-  member_id        INTEGER      NOT NULL,
+  member_id        UUID         NOT NULL,
   quiz_id          VARCHAR      NOT NULL,
   attempt_number   SMALLINT     NOT NULL,
   answers          JSONB        NOT NULL,
@@ -541,15 +458,15 @@ CREATE TABLE lms_quiz_submissions (
 
 CREATE TABLE lms_prompt_submissions (
   id                    SERIAL       PRIMARY KEY,
-  member_id             INTEGER      NOT NULL,
+  member_id             UUID         NOT NULL,
   prompt_id             INTEGER      NOT NULL,
-  assigned_by_id        INTEGER          NULL,
+  assigned_by_id        UUID             NULL,
   deadline              TIMESTAMPTZ      NULL,
   message               TEXT             NULL,
   input                 TEXT             NULL,
   output                TEXT             NULL,
   submitted_at          TIMESTAMPTZ      NULL,
-  reviewed_by_id        INTEGER          NULL,
+  reviewed_by_id        UUID             NULL,
   reviewed_at           TIMESTAMPTZ      NULL,
   comment               TEXT             NULL,
   is_accepted           BOOLEAN      NOT NULL  DEFAULT FALSE,
@@ -565,9 +482,9 @@ CREATE TABLE lms_prompt_submissions (
 
 CREATE TABLE lms_use_case_submissions (
   id                SERIAL                        PRIMARY KEY,
-  member_id         INTEGER                       NOT NULL,
+  member_id         UUID                          NOT NULL,
   use_case_id       INTEGER                       NOT NULL,
-  assigned_by_id    INTEGER                           NULL,
+  assigned_by_id    UUID                              NULL,
   deadline          TIMESTAMPTZ                       NULL,
   message           TEXT                              NULL,
   outcome_proof     VARCHAR                           NULL,
@@ -578,7 +495,7 @@ CREATE TABLE lms_use_case_submissions (
   frequency         lms_use_case_frequency_enum       NULL,
   type              lms_use_case_type_enum            NULL,
   submitted_at      TIMESTAMPTZ                       NULL,
-  reviewed_by_id    INTEGER                           NULL,
+  reviewed_by_id    UUID                              NULL,
   reviewed_at       TIMESTAMPTZ                       NULL,
   comment           TEXT                              NULL,
   is_accepted       BOOLEAN                       NOT NULL  DEFAULT FALSE,
@@ -589,7 +506,7 @@ CREATE TABLE lms_use_case_submissions (
 
 CREATE TABLE lms_xp_earnings (
   id             SERIAL                   PRIMARY KEY,
-  member_id      INTEGER                  NOT NULL,
+  member_id      UUID                     NOT NULL,
   learning_type  lms_learning_type_enum   NOT NULL,
   learning_id    VARCHAR                  NOT NULL,
   xp_earned      SMALLINT                 NOT NULL,
@@ -601,7 +518,7 @@ CREATE TABLE lms_xp_earnings (
 
 CREATE TABLE lms_pre_assessments (
   id                      SERIAL                          PRIMARY KEY,
-  member_id               INTEGER                         NOT NULL  UNIQUE,
+  member_id               UUID                            NOT NULL  UNIQUE,
   ai_use_frequency        lms_pa_ai_use_freq_enum          NOT NULL,
   ai_tools_used           TEXT[]                               NULL,
   ai_limitations          TEXT[]                               NULL,
@@ -651,15 +568,9 @@ CREATE TABLE lms_announcement (
 -- References --
 ----------------
 
--- Shared account tables
-
-ALTER TABLE users
-  ADD FOREIGN KEY (phone_country_id) REFERENCES phone_country_codes (id),
-  ADD FOREIGN KEY (role_id)          REFERENCES roles (id),
-  ADD FOREIGN KEY (team_id)          REFERENCES teams (id),
-  ADD FOREIGN KEY (invited_by_id)    REFERENCES users (id);
-
 -- Trainer pipeline
+--
+-- users (id) is external, owned by a separate account/identity service and not defined in this file (see the note next to CREATE TABLE trainers).
 
 ALTER TABLE trainers
   ADD FOREIGN KEY (user_id)     REFERENCES users (id),
@@ -678,10 +589,7 @@ ALTER TABLE trainer_certifications
 
 -- LMS program structure
 
--- lms_projects.company_id and lms_projects.pipeline_id point at b2b_company
--- and b2b_pipeline, which live in the CRM module and are not defined in this
--- file. The constraints are listed here to document the relationship, but
--- only apply once that module's tables exist in the same database.
+-- lms_projects.company_id and lms_projects.pipeline_id point at b2b_company and b2b_pipeline, owned by the CRM module and not defined in this file.
 ALTER TABLE lms_projects
   ADD FOREIGN KEY (company_id)  REFERENCES b2b_company (id),
   ADD FOREIGN KEY (pipeline_id) REFERENCES b2b_pipeline (id);
@@ -731,47 +639,47 @@ ALTER TABLE lms_use_case_categories
   ADD FOREIGN KEY (use_case_id) REFERENCES lms_use_cases (id),
   ADD FOREIGN KEY (category_id) REFERENCES lms_categories (id);
 
--- LMS members & progress
+-- LMS users & progress
 
 ALTER TABLE lms_groups
   ADD FOREIGN KEY (project_id)  REFERENCES lms_projects (id),
-  ADD FOREIGN KEY (champion_id) REFERENCES lms_members (id);
+  ADD FOREIGN KEY (champion_id) REFERENCES lms_users (id);
 
 ALTER TABLE lms_coaching_notes
-  ADD FOREIGN KEY (member_id)    REFERENCES lms_members (id),
-  ADD FOREIGN KEY (champion_id)  REFERENCES lms_members (id);
+  ADD FOREIGN KEY (member_id)    REFERENCES lms_users (id),
+  ADD FOREIGN KEY (champion_id)  REFERENCES lms_users (id);
 
 ALTER TABLE lms_material_completions
-  ADD FOREIGN KEY (member_id)   REFERENCES lms_members (id),
+  ADD FOREIGN KEY (member_id)   REFERENCES lms_users (id),
   ADD FOREIGN KEY (material_id) REFERENCES lms_materials (id);
 
 ALTER TABLE lms_video_completions
-  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id),
+  ADD FOREIGN KEY (member_id) REFERENCES lms_users (id),
   ADD FOREIGN KEY (video_id)  REFERENCES lms_videos (id);
 
 ALTER TABLE lms_quiz_submissions
-  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id),
+  ADD FOREIGN KEY (member_id) REFERENCES lms_users (id),
   ADD FOREIGN KEY (quiz_id)   REFERENCES lms_quizzes (id);
 
 ALTER TABLE lms_prompt_submissions
-  ADD FOREIGN KEY (member_id)      REFERENCES lms_members (id),
+  ADD FOREIGN KEY (member_id)      REFERENCES lms_users (id),
   ADD FOREIGN KEY (prompt_id)      REFERENCES lms_prompts (id),
-  ADD FOREIGN KEY (assigned_by_id) REFERENCES lms_members (id),
-  ADD FOREIGN KEY (reviewed_by_id) REFERENCES lms_members (id);
+  ADD FOREIGN KEY (assigned_by_id) REFERENCES lms_users (id),
+  ADD FOREIGN KEY (reviewed_by_id) REFERENCES lms_users (id);
 
 ALTER TABLE lms_use_case_submissions
-  ADD FOREIGN KEY (member_id)      REFERENCES lms_members (id),
+  ADD FOREIGN KEY (member_id)      REFERENCES lms_users (id),
   ADD FOREIGN KEY (use_case_id)    REFERENCES lms_use_cases (id),
-  ADD FOREIGN KEY (assigned_by_id) REFERENCES lms_members (id),
-  ADD FOREIGN KEY (reviewed_by_id) REFERENCES lms_members (id);
+  ADD FOREIGN KEY (assigned_by_id) REFERENCES lms_users (id),
+  ADD FOREIGN KEY (reviewed_by_id) REFERENCES lms_users (id);
 
 ALTER TABLE lms_xp_earnings
-  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id);
+  ADD FOREIGN KEY (member_id) REFERENCES lms_users (id);
 
 -- LMS pre-assessment
 
 ALTER TABLE lms_pre_assessments
-  ADD FOREIGN KEY (member_id) REFERENCES lms_members (id);
+  ADD FOREIGN KEY (member_id) REFERENCES lms_users (id);
 
 ALTER TABLE lms_pre_assessment_reports
   ADD FOREIGN KEY (pre_assessment_id) REFERENCES lms_pre_assessments (id);
@@ -791,23 +699,6 @@ $$ LANGUAGE plpgsql;
 --------------
 -- Triggers --
 --------------
-
--- Shared account tables
-
-CREATE TRIGGER update_roles_updated_at_trigger
-  BEFORE UPDATE ON roles
-  FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_teams_updated_at_trigger
-  BEFORE UPDATE ON teams
-  FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_users_updated_at_trigger
-  BEFORE UPDATE ON users
-  FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at();
 
 -- Trainer pipeline
 
@@ -882,7 +773,12 @@ CREATE TRIGGER update_lms_use_cases_updated_at_trigger
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
--- LMS members & progress
+-- LMS users & progress
+
+CREATE TRIGGER update_lms_users_updated_at_trigger
+  BEFORE UPDATE ON lms_users
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER update_lms_groups_updated_at_trigger
   BEFORE UPDATE ON lms_groups
