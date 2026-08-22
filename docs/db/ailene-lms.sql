@@ -412,6 +412,14 @@ CREATE TABLE lms_users (
   updated_at      TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE lms_tokens (
+  id           SERIAL       PRIMARY KEY,
+  user_id      UUID         NOT NULL,
+  token        TEXT         NOT NULL  UNIQUE,
+  is_active    BOOLEAN      NOT NULL  DEFAULT FALSE,
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE lms_groups (
   id           SERIAL       PRIMARY KEY,
   name         VARCHAR      NOT NULL,
@@ -640,6 +648,9 @@ ALTER TABLE lms_use_case_categories
   ADD FOREIGN KEY (category_id) REFERENCES lms_categories (id);
 
 -- LMS users & progress
+
+ALTER TABLE lms_tokens
+  ADD FOREIGN KEY (user_id) REFERENCES lms_users (id);
 
 ALTER TABLE lms_groups
   ADD FOREIGN KEY (project_id)  REFERENCES lms_projects (id),
