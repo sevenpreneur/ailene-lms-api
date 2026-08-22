@@ -1,9 +1,7 @@
-package com.ailene.lms.controller;
+package com.ailene.lms.role;
 
-import com.ailene.lms.dto.RoleDto;
-import com.ailene.lms.exception.ResourceNotFoundException;
-import com.ailene.lms.repository.RoleRepository;
-import com.ailene.lms.response.ApiResponse;
+import com.ailene.lms.common.exception.ResourceNotFoundException;
+import com.ailene.lms.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,9 +1,6 @@
-package com.ailene.lms.controller;
+package com.ailene.lms.auth;
 
-import com.ailene.lms.dto.AuthLoginResponse;
-import com.ailene.lms.dto.GoogleLoginRequest;
-import com.ailene.lms.response.ApiResponse;
-import com.ailene.lms.service.AuthService;
+import com.ailene.lms.common.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

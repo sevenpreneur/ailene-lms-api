@@ -1,4 +1,4 @@
-package com.ailene.lms.dto;
+package com.ailene.lms.auth;
 
 import jakarta.validation.constraints.NotBlank;
 

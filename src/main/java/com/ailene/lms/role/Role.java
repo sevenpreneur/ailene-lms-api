@@ -1,4 +1,4 @@
-package com.ailene.lms.entity;
+package com.ailene.lms.role;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -1,13 +1,9 @@
-package com.ailene.lms.service;
+package com.ailene.lms.auth;
 
-import com.ailene.lms.dto.AuthLoginResponse;
-import com.ailene.lms.dto.GoogleLoginRequest;
-import com.ailene.lms.dto.UserDto;
-import com.ailene.lms.entity.Token;
-import com.ailene.lms.entity.User;
-import com.ailene.lms.exception.ForbiddenException;
-import com.ailene.lms.repository.TokenRepository;
-import com.ailene.lms.repository.UserRepository;
+import com.ailene.lms.common.exception.ForbiddenException;
+import com.ailene.lms.user.User;
+import com.ailene.lms.user.UserDto;
+import com.ailene.lms.user.UserRepository;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

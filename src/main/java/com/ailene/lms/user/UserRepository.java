@@ -1,6 +1,5 @@
-package com.ailene.lms.repository;
+package com.ailene.lms.user;
 
-import com.ailene.lms.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

@@ -1,6 +1,6 @@
-package com.ailene.lms.exception;
+package com.ailene.lms.common.exception;
 
-import com.ailene.lms.response.ApiResponse;
+import com.ailene.lms.common.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;

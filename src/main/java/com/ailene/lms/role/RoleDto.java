@@ -1,6 +1,4 @@
-package com.ailene.lms.dto;
-
-import com.ailene.lms.entity.Role;
+package com.ailene.lms.role;
 
 import java.time.OffsetDateTime;
 

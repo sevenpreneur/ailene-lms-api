@@ -1,4 +1,4 @@
-package com.ailene.lms.response;
+package com.ailene.lms.common.response;
 
 public enum StatusName {
     OK,

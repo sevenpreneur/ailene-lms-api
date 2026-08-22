@@ -1,4 +1,4 @@
-package com.ailene.lms.exception;
+package com.ailene.lms.common.exception;
 
 public class UnauthorizedException extends RuntimeException {
 

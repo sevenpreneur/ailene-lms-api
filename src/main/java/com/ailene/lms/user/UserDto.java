@@ -1,7 +1,4 @@
-package com.ailene.lms.dto;
-
-import com.ailene.lms.entity.User;
-import com.ailene.lms.enums.UserRole;
+package com.ailene.lms.user;
 
 import java.util.UUID;
 

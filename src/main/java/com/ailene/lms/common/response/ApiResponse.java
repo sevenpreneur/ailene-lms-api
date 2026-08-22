@@ -1,4 +1,4 @@
-package com.ailene.lms.response;
+package com.ailene.lms.common.response;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

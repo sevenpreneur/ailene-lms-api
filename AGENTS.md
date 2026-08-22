@@ -18,27 +18,24 @@ Java 21, Spring Boot 4.1.0 (`spring-boot-starter-web`, `spring-boot-starter-data
 
 ## Project structure
 
-Package-by-layer under `com.ailene.lms.<layer>` — every feature's files are split across the layer packages, not grouped by feature:
+Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `Entity`, `EntityController`, `EntityDto`, `EntityRepository`, etc. directly in one package (no separate controller/service/repository/dto layer packages — was tried, reverted). Cross-feature code (response envelope, exception handling) lives in `com.ailene.lms.common`.
 
-| Layer | Owns |
+| Package | Owns |
 |---|---|
-| `controller` | `@RestController`s (`RoleController`, `AuthController`) |
-| `service` | Business logic (`AuthService`, `GoogleTokenVerifier`) — controllers that don't need one call `repository` directly (e.g. `RoleController`) |
-| `dto` | Request/response records, each with a `public static from(Entity)` factory where applicable |
-| `repository` | `JpaRepository` interfaces |
-| `entity` | `@Entity` classes |
-| `enums` | Java enums backing Postgres native enum columns (e.g. `UserRole`) |
-| `response` | `ApiResponse<T>` envelope, `StatusName` |
-| `exception` | `GlobalExceptionHandler`, sentinel exception classes |
+| `role` | `Role` entity + read-only `/api/roles` endpoints (`RoleController`, `RoleDto`, `RoleRepository`) |
+| `user` | `User`/`UserRole` entity + `UserDto`/`UserRepository` — the LMS's own user profile, no endpoints of its own yet (consumed by `auth`) |
+| `auth` | Google login (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleLoginRequest`, `AuthLoginResponse`) and its `Token`/`TokenRepository` |
+| `common.response` | `ApiResponse<T>` envelope, `StatusName` |
+| `common.exception` | `GlobalExceptionHandler`, sentinel exception classes |
 
 ## Conventions — follow these exactly, they're load-bearing
 
-- **Response envelope:** always return `ApiResponse.success(HttpStatus, message, data)` or `ApiResponse.error(HttpStatus, message)` from `response`, wrapped in `ResponseEntity` — never build a `ResponseEntity` or return a raw body directly. `StatusName.fromCode()` must stay in sync with every `HttpStatus` actually used.
+- **Response envelope:** always return `ApiResponse.success(HttpStatus, message, data)` or `ApiResponse.error(HttpStatus, message)` from `common.response`, wrapped in `ResponseEntity` — never build a `ResponseEntity` or return a raw body directly. `StatusName.fromCode()` must stay in sync with every `HttpStatus` actually used.
 - **JSON is snake_case** (`spring.jackson.property-naming-strategy: SNAKE_CASE` in `application.yaml`), matching the DB's column naming — Java fields stay camelCase (`fullName`), Jackson converts both ways at the boundary, so DTOs never need `@JsonProperty`. One quirk: `@Valid` field-validation error messages (`GlobalExceptionHandler.handleValidation`) report the Java property name, not the JSON one — e.g. sending a blank `id_token` comes back as `"idToken: must not be blank"`, not `"id_token: ..."`. Don't try to "fix" that by renaming the Java field; it's a Bean Validation limitation, not a bug.
-- **Errors:** declare exception types under `exception` and register a handler in `GlobalExceptionHandler` (`@RestControllerAdvice`) that maps it to `ApiResponse.error(...)`. The catch-all `Exception` handler must never leak raw exception text — keep it a generic message.
-- **DTOs are records with a `public static from(Entity)` factory** — see `RoleDto`/`UserDto`. Controllers return DTOs, never JPA entities directly. Mark the factory `public`: DTO and entity now live in different packages, so package-private breaks compilation.
-- **Entities:** Lombok `@Getter`/`@Setter`, explicit `@Column(name = "snake_case")`, `OffsetDateTime` for `TIMESTAMPTZ` columns. Match the live column type exactly (e.g. `CHAR(21)` nanoid-style ids are `String`, not a numeric type). Postgres native enum columns use `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`, and the Java enum constants in `enums` must be spelled exactly like the Postgres labels (lowercase, e.g. `UserRole.student`) since Hibernate matches by `name()`.
-- **Entity class names don't always match the table**, on purpose (mirrors `Role`→`roles`): `User`→`lms_users`, `Token`→`lms_tokens`. `User`/`Token`/`UserDto`/`UserRepository`/`TokenRepository` are the LMS's own tables — don't confuse them with `Role`/`RoleRepository`, which map to the separate account/identity service's `roles` table (see Database). `UserRole` (the `student`/`champion`/`sponsor` enum) is intentionally not called `Role`, to avoid colliding with that unrelated `Role` entity.
+- **Errors:** declare exception types under `common.exception` and register a handler in `GlobalExceptionHandler` (`@RestControllerAdvice`) that maps it to `ApiResponse.error(...)`. The catch-all `Exception` handler must never leak raw exception text — keep it a generic message.
+- **DTOs are records with a `public static from(Entity)` factory** — see `RoleDto`/`UserDto`. Controllers return DTOs, never JPA entities directly. Keep the factory `public` even though the DTO usually shares a package with its entity: some DTOs are consumed from another feature package too (`auth.AuthLoginResponse` wraps `user.UserDto`), and package-private would break that.
+- **Entities:** Lombok `@Getter`/`@Setter`, explicit `@Column(name = "snake_case")`, `OffsetDateTime` for `TIMESTAMPTZ` columns. Match the live column type exactly (e.g. `CHAR(21)` nanoid-style ids are `String`, not a numeric type). Postgres native enum columns use `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`, and the Java enum constants must be spelled exactly like the Postgres labels (lowercase, e.g. `UserRole.student`) since Hibernate matches by `name()`.
+- **Entity class names don't always match the table**, on purpose (mirrors `Role`→`roles`): `user.User`→`lms_users`, `auth.Token`→`lms_tokens`. Those are the LMS's own tables — don't confuse them with `role.Role`, which maps to the separate account/identity service's `roles` table (see Database). `user.UserRole` (the `student`/`champion`/`sponsor` enum) is intentionally not called `Role`, to avoid colliding with that unrelated `role.Role` entity.
 - **Comments:** one line, no multi-line comment blocks. If it needs more than one line, it needs a shorter explanation instead.
 - **API docs live in `docs/<area>.md`** (e.g. `docs/auth.md`), one file per feature area, not per controller class. Format: one intro paragraph, then per endpoint a one-sentence description, `**Authorization:**` line, request as a JSON block + Field/Type/Required table, response as a JSON block (no field table) with any non-obvious fields explained in a paragraph after it, and an `**Errors**` table (`Code | Status | Message | When`) plus one example error response. Update the relevant doc whenever a controller's request/response shape or error cases change.
 - **`.env` loading is intentionally not SPI-based.** `me.paulschwarz:spring-dotenv` and a hand-rolled `EnvironmentPostProcessor` (both registered via `META-INF`) were tried first and silently never got invoked on this Spring Boot version — instead `LmsApplication` loads `.env` in a `static {}` block before `main()` calls `SpringApplication.run()`. That block does **not** fire for `@SpringBootTest`, because Spring only reads `LmsApplication`'s bytecode metadata there and never actually loads the class — so `LmsApplicationTests` has its own `static {}` block calling the same package-private `LmsApplication.loadDotenv()`. Any other test class that needs `.env` (e.g. a future `@SpringBootTest`) needs that same static block copied in, since it isn't inherited automatically.

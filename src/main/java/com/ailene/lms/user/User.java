@@ -1,6 +1,5 @@
-package com.ailene.lms.entity;
+package com.ailene.lms.user;
 
-import com.ailene.lms.enums.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
