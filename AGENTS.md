@@ -12,7 +12,7 @@ Java 21, Spring Boot 4.1.0 (`spring-boot-starter-web`, `spring-boot-starter-data
 
 ## Running locally
 
-1. Copy `.env.example` to `.env` and fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (Neon Postgres) and `GOOGLE_OAUTH_ID`. `PORT` is optional, defaults to `8080`.
+1. Copy `.env.example` to `.env` and fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (Neon Postgres), `GOOGLE_OAUTH_ID`, and `SECRET_KEY` (any random string — it's the static token `POST /api/auth/login/google` checks, see `docs/auth.md`). `PORT` is optional, defaults to `8080`.
 2. `./mvnw spring-boot:run` — serves on `:$PORT`. `.env` is loaded automatically (see `LmsApplication.loadDotenv()`); no manual export needed, and it never overrides a var that's already set in the real environment.
 3. No real automated test suite exists yet — `LmsApplicationTests` is just the default `contextLoads()` placeholder, and it boots the full Spring context (needs a live DB connection since `ddl-auto: validate`). `./mvnw test` also picks up `.env` automatically — see the note in Conventions about why that needed its own static block instead of just relying on `LmsApplication`'s. There is no linter configured in `pom.xml`.
 
@@ -49,5 +49,5 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 ## Known gaps
 
 - No automated tests beyond the Spring context-load placeholder. No CI config in this repo.
-- Auth so far is just Google ID token login issuing an opaque `lms_tokens` row (`AuthController`/`AuthService`) — nothing validates that token on subsequent requests yet, so every other endpoint is still effectively open.
+- Auth so far is just Google ID token login issuing an opaque `lms_tokens` row (`AuthController`/`AuthService`) — nothing validates that token on subsequent requests yet, so every other endpoint is still effectively open. The login endpoint itself is gated by a single shared `SECRET_KEY` (same value for every client) — it stops randoms from hitting the endpoint, it isn't per-client auth.
 - Flyway is a dependency but unused in practice (see Database) — this is a real gap, not a deliberate choice.

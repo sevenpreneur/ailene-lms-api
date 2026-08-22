@@ -1,6 +1,6 @@
 # Auth
 
-Google-only login: the client signs the user in with Google Identity Services and hands us the resulting ID token, which we verify directly against Google (signature + audience + `email_verified`) and exchange for our own opaque token, tracked in `lms_tokens`. There is no sign-up flow — the Google account's email must already exist as an `lms_users` row, or the call is rejected.
+Google-only login: the client signs the user in with Google Identity Services and hands us the resulting ID token, which we verify directly against Google (signature + audience + `email_verified`) and exchange for our own opaque token, tracked in `lms_tokens`. There is no sign-up flow — the Google account's email must already exist as an `lms_users` row, or the call is rejected. The endpoint is additionally gated by a static bearer token (see below), since the caller has no per-user credential yet at that point.
 
 ## Endpoints
 
@@ -8,7 +8,7 @@ Google-only login: the client signs the user in with Google Identity Services an
 
 Verifies a Google ID token and logs the matching LMS user in.
 
-**Authorization:** none — this endpoint issues the token, so there's nothing to authorize yet. The Google ID token in the request body is the credential.
+**Authorization:** `Bearer <SECRET_KEY>` — a single static token shared by every legitimate client, checked against the `SECRET_KEY` env var. This isn't per-user auth (the Google ID token in the body is what identifies the user); it just keeps the endpoint from being callable by anyone who stumbles on the URL.
 
 **Request**
 
@@ -52,6 +52,8 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 
 | Code | Status | Message | When |
 |---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Bearer token is invalid` | header present, but doesn't match `SECRET_KEY` |
 | 400 | `BAD_REQUEST` | `idToken: must not be blank` | missing/empty `id_token` field — the message uses the Java field name (`idToken`), not the snake_case JSON one, since validation errors report the bean property name |
 | 401 | `UNAUTHORIZED` | `Failed to verify Google ID token` | token is malformed, or Google's verification call itself failed |
 | 401 | `UNAUTHORIZED` | `Invalid or unverified Google ID token` | signature/audience check failed, or the Google account's email isn't verified |
