@@ -1,4 +1,4 @@
-package com.ailene.lms.role;
+package com.ailene.lms.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,26 +10,27 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "roles")
+@Table(name = "lms_tokens")
 @Getter
 @Setter
-public class Role {
+public class Token {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Short id;
+    private Integer id;
+
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(nullable = false, unique = true)
-    private String name;
+    private String token;
 
-    @Column(nullable = false)
-    private Short permission;
+    @Column(name = "is_active", nullable = false)
+    private boolean active;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
 }

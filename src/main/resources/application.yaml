@@ -19,6 +19,10 @@ spring:
 server:
   port: ${PORT:8080}
 
+google:
+  oauth:
+    client-id: ${GOOGLE_OAUTH_ID}
+
 management:
   endpoints:
     web:

@@ -1,4 +1,4 @@
-package com.ailene.lms.common.exception;
+package com.ailene.lms.exception;
 
 public class ResourceNotFoundException extends RuntimeException {
 
