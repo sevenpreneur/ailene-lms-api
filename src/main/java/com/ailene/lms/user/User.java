@@ -34,7 +34,7 @@ public class User {
     @Column(name = "last_active_at")
     private OffsetDateTime lastActiveAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
