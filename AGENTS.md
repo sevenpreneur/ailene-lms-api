@@ -22,14 +22,15 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 
 | Package | Owns |
 |---|---|
-| `role` | `Role` entity + read-only `/api/roles` endpoints (`RoleController`, `RoleDto`, `RoleRepository`) |
+| `role` | `Role` entity + `/api/roles` endpoints (`RoleController`, `RoleDto`, `RoleRepository`) |
 | `user` | `User`/`UserRole` entity + `UserDto`/`UserRepository` — the LMS's own user profile, no endpoints of its own yet (consumed by `auth`) |
-| `auth` | Google login (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleUserInfo`, `JwtService`, `GoogleLoginRequest`, `AuthLoginResponse`) and its `Token`/`TokenRepository` |
+| `auth` | Google login, session check, and logout (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleUserInfo`, `JwtService`, `GoogleLoginRequest`, `AuthLoginResponse`) and its `Token`/`TokenRepository` |
 | `common.response` | `ApiResponse<T>` envelope, `StatusName` |
 | `common.exception` | `GlobalExceptionHandler`, sentinel exception classes |
 
 ## Conventions — follow these exactly, they're load-bearing
 
+- **Every endpoint is `POST`.** No `GET`/`PUT`/`DELETE`/`PATCH` anywhere, even for reads or ones with no request body (`RoleController`, `check-session`, `logout`) — use `@PostMapping` regardless. This isn't a security boundary, it's just the house style; don't reintroduce other verbs. A wrong-method request is handled by `GlobalExceptionHandler.handleMethodNotSupported` (405 `METHOD_NOT_ALLOWED`), not the generic 500 handler — keep that mapping in sync if you add new routes.
 - **Response envelope:** always return `ApiResponse.success(HttpStatus, message, data)` or `ApiResponse.error(HttpStatus, message)` from `common.response`, wrapped in `ResponseEntity` — never build a `ResponseEntity` or return a raw body directly. `StatusName.fromCode()` must stay in sync with every `HttpStatus` actually used.
 - **JSON is snake_case** (`spring.jackson.property-naming-strategy: SNAKE_CASE` in `application.yaml`), matching the DB's column naming — Java fields stay camelCase (`fullName`), Jackson converts both ways at the boundary, so DTOs never need `@JsonProperty`. That global config only applies to Spring MVC's own request/response bodies, though — a manually-built `RestClient` (see the note below) does not inherit it, so `auth.GoogleUserInfo` uses an explicit `@JsonProperty("email_verified")` instead of relying on the strategy. One quirk: `@Valid` field-validation error messages (`GlobalExceptionHandler.handleValidation`) report the Java property name, not the JSON one — e.g. sending a blank `access_token` comes back as `"accessToken: must not be blank"`, not `"access_token: ..."`. Don't try to "fix" that by renaming the Java field; it's a Bean Validation limitation, not a bug.
 - **Errors:** declare exception types under `common.exception` and register a handler in `GlobalExceptionHandler` (`@RestControllerAdvice`) that maps it to `ApiResponse.error(...)`. The catch-all `Exception` handler must never leak raw exception text — keep it a generic message.
@@ -50,5 +51,5 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 ## Known gaps
 
 - No automated tests beyond the Spring context-load placeholder. No CI config in this repo.
-- Auth so far is just Google login: verify a Google access token via `userinfo`, then issue our own HS256 JWT (signed with `SECRET_KEY`) stored in `lms_tokens` (`AuthController`/`AuthService`) — nothing validates that JWT on subsequent requests yet, so every other endpoint is still effectively open. The login endpoint itself is gated by that same shared `SECRET_KEY` as a static bearer token (same value for every client) — it stops randoms from hitting the endpoint, it isn't per-client auth. `SECRET_KEY` is deliberately dual-purpose (bearer-token gate + JWT signing key), not two separate secrets.
+- Auth covers login/session-check/logout (`AuthController`/`AuthService`/`JwtService`) but nothing else: `check-session` and `logout` validate the `Bearer` JWT against `lms_tokens`, but no other controller (e.g. `RoleController`) requires auth at all yet — there's no shared filter/interceptor enforcing it app-wide. `login/google` itself is gated by a shared `SECRET_KEY` as a static bearer token (same value for every client, not per-client auth) — `SECRET_KEY` is deliberately dual-purpose (that gate + the JWT signing key), not two separate secrets.
 - Flyway is a dependency but unused in practice (see Database) — this is a real gap, not a deliberate choice.

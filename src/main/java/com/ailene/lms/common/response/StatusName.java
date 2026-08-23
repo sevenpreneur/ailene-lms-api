@@ -8,6 +8,7 @@ public enum StatusName {
     UNAUTHORIZED,
     FORBIDDEN,
     NOT_FOUND,
+    METHOD_NOT_ALLOWED,
     CONFLICT,
     INTERNAL_SERVER_ERROR;
 
@@ -20,6 +21,7 @@ public enum StatusName {
             case 401 -> UNAUTHORIZED;
             case 403 -> FORBIDDEN;
             case 404 -> NOT_FOUND;
+            case 405 -> METHOD_NOT_ALLOWED;
             case 409 -> CONFLICT;
             case 500 -> INTERNAL_SERVER_ERROR;
             default -> INTERNAL_SERVER_ERROR;

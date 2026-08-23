@@ -1,6 +1,9 @@
 package com.ailene.lms.auth;
 
+import com.ailene.lms.common.exception.UnauthorizedException;
 import com.ailene.lms.user.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,5 +35,17 @@ public class JwtService {
                 .expiration(Date.from(now.plus(365, ChronoUnit.DAYS)))
                 .signWith(signingKey)
                 .compact();
+    }
+
+    public Claims parse(String jwt) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(jwt)
+                    .getPayload();
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new UnauthorizedException("Invalid or expired token");
+        }
     }
 }

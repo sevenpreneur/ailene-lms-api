@@ -1,14 +1,17 @@
 package com.ailene.lms.auth;
 
 import com.ailene.lms.common.exception.ForbiddenException;
+import com.ailene.lms.common.exception.UnauthorizedException;
 import com.ailene.lms.user.User;
 import com.ailene.lms.user.UserDto;
 import com.ailene.lms.user.UserRepository;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -39,5 +42,28 @@ public class AuthService {
         tokenRepository.save(token);
 
         return new AuthLoginResponse(jwt, UserDto.from(user));
+    }
+
+    public UserDto checkSession(String jwt) {
+        Claims claims = jwtService.parse(jwt);
+
+        tokenRepository.findByTokenAndActiveTrue(jwt)
+                .orElseThrow(() -> new UnauthorizedException("Session not found or already ended"));
+
+        UUID userId = UUID.fromString(claims.getSubject());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Session not found or already ended"));
+
+        return UserDto.from(user);
+    }
+
+    @Transactional
+    public void logout(String jwt) {
+        jwtService.parse(jwt);
+
+        Token token = tokenRepository.findByToken(jwt)
+                .orElseThrow(() -> new UnauthorizedException("Session not found or already ended"));
+
+        tokenRepository.delete(token);
     }
 }
