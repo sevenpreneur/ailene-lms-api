@@ -2,7 +2,6 @@ package com.ailene.lms.auth;
 
 import com.ailene.lms.common.response.ApiResponse;
 import com.ailene.lms.common.security.SecretKeyGuard;
-import com.ailene.lms.user.UserDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -32,10 +31,10 @@ public class AuthController {
     }
 
     @PostMapping("/check-session")
-    public ResponseEntity<ApiResponse<UserDto>> checkSession(
+    public ResponseEntity<ApiResponse<CheckSessionResponse>> checkSession(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
-        UserDto user = authService.checkSession(secretKeyGuard.extractBearerToken(authorization));
-        return ApiResponse.success(HttpStatus.OK, "session is valid", user);
+        CheckSessionResponse response = authService.checkSession(secretKeyGuard.extractBearerToken(authorization));
+        return ApiResponse.success(HttpStatus.OK, "session is valid", response);
     }
 
     @PostMapping("/logout")

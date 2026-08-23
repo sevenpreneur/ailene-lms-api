@@ -1,5 +1,7 @@
 package com.ailene.lms.auth;
 
+import com.ailene.lms.access.AccessRepository;
+import com.ailene.lms.access.ProjectAccessDto;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.UnauthorizedException;
 import com.ailene.lms.user.User;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -21,6 +24,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
+    private final AccessRepository accessRepository;
 
     @Transactional
     public AuthLoginResponse loginWithGoogle(GoogleLoginRequest request) {
@@ -44,7 +48,7 @@ public class AuthService {
         return new AuthLoginResponse(jwt, UserDto.from(user));
     }
 
-    public UserDto checkSession(String jwt) {
+    public CheckSessionResponse checkSession(String jwt) {
         Claims claims = jwtService.parse(jwt);
 
         tokenRepository.findByTokenAndActiveTrue(jwt)
@@ -54,7 +58,11 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UnauthorizedException("Session not found or already ended"));
 
-        return UserDto.from(user);
+        List<ProjectAccessDto> projectAccess = accessRepository.findProjectAccessByUserId(userId).stream()
+                .map(ProjectAccessDto::from)
+                .toList();
+
+        return new CheckSessionResponse(UserDto.from(user), projectAccess);
     }
 
     @Transactional

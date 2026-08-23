@@ -89,16 +89,26 @@ No request body.
   "status": "OK",
   "message": "session is valid",
   "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "full_name": "Akmal Luthfiansyah",
-    "email": "akmal@example.com",
-    "avatar": "https://lh3.googleusercontent.com/a/xxx",
-    "job_title": "Software Engineer"
+    "user": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "full_name": "Akmal Luthfiansyah",
+      "email": "akmal@example.com",
+      "avatar": "https://lh3.googleusercontent.com/a/xxx",
+      "job_title": "Software Engineer"
+    },
+    "project_access": [
+      {
+        "project_id": "V7rdgcYkq9PHQZkwvoA-F",
+        "project_name": "Hutama Karya AI Training",
+        "project_avatar": "https://.../logo-hk.webp",
+        "role": "champion"
+      }
+    ]
   }
 }
 ```
 
-`data` here is fetched fresh from `lms_users` on every call (not decoded from the JWT), so it reflects any profile changes made since the token was issued.
+`data.user` is fetched fresh from `lms_users` on every call (not decoded from the JWT), so it reflects any profile changes made since the token was issued. `data.project_access` lists every `lms_accesses` row for this user — one entry per project they have a role on (`champion`, `student`, or `sponsor`); `project_avatar` is that project's `b2b_company.image_url` and can be `null` if the project has no `company_id` or the company has no logo set. An empty array means the user isn't attached to any project yet.
 
 **Errors**
 
