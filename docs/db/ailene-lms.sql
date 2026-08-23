@@ -71,6 +71,14 @@ CREATE TYPE lms_chapter_trainer_request_status_enum AS ENUM (
   'rejected'
 );
 
+-- Enumeration for the lms_accesses table
+
+CREATE TYPE lms_access_role_enum AS ENUM (
+  'champion',
+  'student',
+  'sponsor'
+);
+
 -- Enumeration for the lms_xp_earnings table
 
 CREATE TYPE lms_learning_type_enum AS ENUM (
@@ -237,7 +245,7 @@ CREATE TABLE trainer_certifications (
 -- LMS program structure
 
 CREATE TABLE lms_projects (
-  id             SERIAL       PRIMARY KEY,
+  id             CHAR(21)     PRIMARY KEY,
   name           VARCHAR      NOT NULL,
   company_id     INTEGER          NULL,
   created_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
@@ -255,7 +263,7 @@ CREATE TABLE lms_levels (
   status        status_enum  NOT NULL  DEFAULT 'active',
   created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  project_id    INTEGER      NOT NULL
+  project_id    CHAR(21)     NOT NULL
 );
 
 CREATE TABLE lms_chapters (
@@ -414,10 +422,19 @@ CREATE TABLE lms_tokens (
 CREATE TABLE lms_groups (
   id           SERIAL       PRIMARY KEY,
   name         VARCHAR      NOT NULL,
-  project_id   INTEGER      NOT NULL,
+  project_id   CHAR(21)     NOT NULL,
   champion_id  UUID         NOT NULL,
   created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_accesses (
+  id          CHAR(21)              PRIMARY KEY,
+  project_id  CHAR(21)              NOT NULL,
+  user_id     UUID                  NOT NULL,
+  role        lms_access_role_enum  NOT NULL,
+  created_at  TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE lms_coaching_notes (
@@ -647,6 +664,10 @@ ALTER TABLE lms_groups
   ADD FOREIGN KEY (project_id)  REFERENCES lms_projects (id),
   ADD FOREIGN KEY (champion_id) REFERENCES lms_users (id);
 
+ALTER TABLE lms_accesses
+  ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id),
+  ADD FOREIGN KEY (user_id)    REFERENCES lms_users (id);
+
 ALTER TABLE lms_coaching_notes
   ADD FOREIGN KEY (member_id)    REFERENCES lms_users (id),
   ADD FOREIGN KEY (champion_id)  REFERENCES lms_users (id);
@@ -784,6 +805,11 @@ CREATE TRIGGER update_lms_users_updated_at_trigger
 
 CREATE TRIGGER update_lms_groups_updated_at_trigger
   BEFORE UPDATE ON lms_groups
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_accesses_updated_at_trigger
+  BEFORE UPDATE ON lms_accesses
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
