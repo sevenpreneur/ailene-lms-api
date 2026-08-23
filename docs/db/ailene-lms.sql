@@ -71,14 +71,6 @@ CREATE TYPE lms_chapter_trainer_request_status_enum AS ENUM (
   'rejected'
 );
 
--- Enumeration for the lms_users table
-
-CREATE TYPE lms_role_enum AS ENUM (
-  'student',
-  'champion',
-  'sponsor'
-);
-
 -- Enumeration for the lms_xp_earnings table
 
 CREATE TYPE lms_learning_type_enum AS ENUM (
@@ -401,15 +393,14 @@ CREATE TABLE lms_use_case_categories (
 -- LMS users & progress
 
 CREATE TABLE lms_users (
-  id              UUID           PRIMARY KEY,
-  full_name       VARCHAR        NOT NULL,
-  email           VARCHAR        NOT NULL  UNIQUE,
-  avatar          VARCHAR            NULL,
-  role            lms_role_enum  NOT NULL,
-  job_title       VARCHAR        NOT NULL,
-  last_active_at  TIMESTAMPTZ        NULL,
-  created_at      TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMPTZ    NOT NULL  DEFAULT CURRENT_TIMESTAMP
+  id              UUID         PRIMARY KEY,
+  full_name       VARCHAR      NOT NULL,
+  email           VARCHAR      NOT NULL  UNIQUE,
+  avatar          VARCHAR          NULL,
+  job_title       VARCHAR      NOT NULL,
+  last_active_at  TIMESTAMPTZ      NULL,
+  created_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE lms_tokens (

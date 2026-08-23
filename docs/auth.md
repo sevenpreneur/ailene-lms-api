@@ -37,14 +37,13 @@ Verifies a Google access token and logs the matching LMS user in.
       "full_name": "Akmal Luthfiansyah",
       "email": "akmal@example.com",
       "avatar": "https://lh3.googleusercontent.com/a/xxx",
-      "role": "student",
       "job_title": "Software Engineer"
     }
   }
 }
 ```
 
-`data.token` is a JWT (HS256, signed with `SECRET_KEY`) — claims are `sub` (the user's `id`), `email`, `jti` (a random UUID, so back-to-back logins never produce the same token), `iat`, and `exp` (1 year out). A new row is inserted into `lms_tokens` on every successful login, so a user can hold several active tokens at once — pass this same `token` as `Bearer` on `check-session`/`logout` below. `data.user.avatar` is overwritten from Google's `picture` field on every login, so it always reflects the Google account's current photo. `data.user.role` is one of `student`, `champion`, or `sponsor`.
+`data.token` is a JWT (HS256, signed with `SECRET_KEY`) — claims are `sub` (the user's `id`), `email`, `jti` (a random UUID, so back-to-back logins never produce the same token), `iat`, and `exp` (1 year out). A new row is inserted into `lms_tokens` on every successful login, so a user can hold several active tokens at once — pass this same `token` as `Bearer` on `check-session`/`logout` below. `data.user.avatar` is overwritten from Google's `picture` field on every login, so it always reflects the Google account's current photo.
 
 **Errors**
 
@@ -73,7 +72,7 @@ Example error response (`403 Forbidden`):
 
 ### `POST {base_url}/api/auth/check-session`
 
-Validates a session JWT and returns the caller's current profile — for restoring a session on page reload (e.g. showing name/avatar/role in a sidebar) without logging in again.
+Validates a session JWT and returns the caller's current profile — for restoring a session on page reload (e.g. showing name/avatar in a sidebar) without logging in again.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `login/google`.
 
@@ -94,7 +93,6 @@ No request body.
     "full_name": "Akmal Luthfiansyah",
     "email": "akmal@example.com",
     "avatar": "https://lh3.googleusercontent.com/a/xxx",
-    "role": "student",
     "job_title": "Software Engineer"
   }
 }
