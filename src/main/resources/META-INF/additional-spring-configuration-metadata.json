@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "google.oauth.client-id",
+      "type": "java.lang.String",
+      "description": "Google OAuth client ID used to verify access tokens on login."
+    },
+    {
+      "name": "security.secret-key",
+      "type": "java.lang.String",
+      "description": "Shared secret used to sign session JWTs and gate the login endpoint."
+    }
+  ]
+}
