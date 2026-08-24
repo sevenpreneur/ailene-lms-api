@@ -1,11 +1,11 @@
 package com.ailene.lms.access;
 
 public interface ProjectAccessProjection {
-    String getProjectId();
+    String getId();
 
-    String getProjectName();
+    String getName();
 
-    String getProjectAvatar();
+    String getAvatar();
 
     Integer getGroupId();
 

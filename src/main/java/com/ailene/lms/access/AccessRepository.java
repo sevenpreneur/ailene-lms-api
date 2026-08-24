@@ -10,9 +10,9 @@ import java.util.UUID;
 public interface AccessRepository extends JpaRepository<Access, String> {
 
     @Query(value = """
-            SELECT p.id AS projectId,
-                   p.name AS projectName,
-                   c.image_url AS projectAvatar,
+            SELECT p.id AS id,
+                   p.name AS name,
+                   c.image_url AS avatar,
                    g.id AS groupId,
                    g.name AS groupName,
                    a.role AS role
