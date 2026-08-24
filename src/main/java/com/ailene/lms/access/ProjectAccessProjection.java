@@ -7,5 +7,9 @@ public interface ProjectAccessProjection {
 
     String getProjectAvatar();
 
+    Integer getGroupId();
+
+    String getGroupName();
+
     String getRole();
 }

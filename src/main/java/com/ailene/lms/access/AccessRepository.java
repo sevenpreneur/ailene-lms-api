@@ -13,10 +13,13 @@ public interface AccessRepository extends JpaRepository<Access, String> {
             SELECT p.id AS projectId,
                    p.name AS projectName,
                    c.image_url AS projectAvatar,
+                   g.id AS groupId,
+                   g.name AS groupName,
                    a.role AS role
             FROM lms_accesses a
             JOIN lms_projects p ON p.id = a.project_id
             LEFT JOIN b2b_company c ON c.id = p.company_id
+            LEFT JOIN lms_groups g ON g.id = a.group_id AND g.project_id = a.project_id
             WHERE a.user_id = :userId
             """, nativeQuery = true)
     List<ProjectAccessProjection> findProjectAccessByUserId(@Param("userId") UUID userId);
