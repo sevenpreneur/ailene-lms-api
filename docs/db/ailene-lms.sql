@@ -150,7 +150,6 @@ CREATE TABLE lms_levels (
   project_id    CHAR(21)     NOT NULL,
   level_number  SMALLINT     NOT NULL  UNIQUE,
   name          VARCHAR      NOT NULL,
-  icon          VARCHAR          NULL,
   status        status_enum  NOT NULL  DEFAULT 'active',
   created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
