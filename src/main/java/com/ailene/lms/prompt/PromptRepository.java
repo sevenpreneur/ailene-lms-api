@@ -57,4 +57,32 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             """, nativeQuery = true)
     List<PromptSubmissionProjection> findSubmissionsForAccess(@Param("accessId") String accessId,
             @Param("promptIds") List<Integer> promptIds);
+
+    @Query(value = """
+            SELECT p.id AS id,
+                   p.name AS name,
+                   p.scenario AS description,
+                   p.xp_reward AS xpReward,
+                   ps.deadline AS deadlineAt,
+                   ps.submitted_at AS submittedAt,
+                   ps.reviewed_at AS reviewedAt,
+                   ps.is_accepted AS isAccepted,
+                   au.id AS assignedById,
+                   au.full_name AS assignedByName,
+                   au.avatar AS assignedByAvatar
+            FROM lms_prompt_submissions ps
+            JOIN lms_prompts p ON p.id = ps.prompt_id
+            JOIN lms_levels lv ON lv.id = p.level_id
+            LEFT JOIN lms_accesses aa ON aa.id = ps.assigned_by_access_id
+            LEFT JOIN lms_users au ON au.id = aa.user_id
+            WHERE lv.project_id = :projectId
+              AND ps.student_access_id = :accessId
+              AND ps.assigned_by_access_id IS NOT NULL
+              AND (:hasSubmitted IS NULL OR (ps.submitted_at IS NOT NULL) = :hasSubmitted)
+              AND (:isAccepted IS NULL OR ps.is_accepted = :isAccepted)
+            ORDER BY ps.deadline ASC
+            """, nativeQuery = true)
+    List<PromptAssignedProjection> findAssignedPrompts(@Param("projectId") String projectId,
+            @Param("accessId") String accessId, @Param("hasSubmitted") Boolean hasSubmitted,
+            @Param("isAccepted") Boolean isAccepted);
 }

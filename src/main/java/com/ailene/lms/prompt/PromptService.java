@@ -1,8 +1,11 @@
 package com.ailene.lms.prompt;
 
+import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
+import com.ailene.lms.common.AssignedByUser;
 import com.ailene.lms.common.CategorySummary;
 import com.ailene.lms.common.TimeUtils;
+import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.common.pagination.PageMeta;
 import com.ailene.lms.common.pagination.PagedResponse;
 import com.ailene.lms.common.pagination.Pagination;
@@ -65,5 +68,35 @@ public class PromptService {
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getDeadlineAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
                 submission == null ? null : submission.getIsAccepted());
+    }
+
+    public List<PromptAssignedItem> listAssigned(UUID userId, PromptAssignedRequest request) {
+        Access access = accessRepository.findByUserIdAndProjectId(userId, request.projectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+
+        List<PromptAssignedProjection> assigned = promptRepository.findAssignedPrompts(request.projectId(),
+                access.getId(), request.hasSubmitted(), request.isAccepted());
+
+        List<Integer> promptIds = assigned.stream().map(PromptAssignedProjection::getId).toList();
+        Map<Integer, List<CategorySummary>> categoriesByPrompt = promptIds.isEmpty()
+                ? Map.of()
+                : promptRepository.findCategoriesForPrompts(promptIds).stream()
+                        .collect(Collectors.groupingBy(PromptCategoryProjection::getPromptId,
+                                Collectors.mapping(c -> new CategorySummary(c.getId(), c.getName()),
+                                        Collectors.toList())));
+
+        return assigned.stream()
+                .map(prompt -> toAssignedItem(prompt, categoriesByPrompt.getOrDefault(prompt.getId(), List.of())))
+                .toList();
+    }
+
+    private PromptAssignedItem toAssignedItem(PromptAssignedProjection prompt, List<CategorySummary> categories) {
+        AssignedByUser assignedBy = prompt.getAssignedById() == null ? null
+                : new AssignedByUser(prompt.getAssignedById(), prompt.getAssignedByName(),
+                        prompt.getAssignedByAvatar());
+        return new PromptAssignedItem(prompt.getId(), prompt.getName(), prompt.getDescription(), categories,
+                prompt.getXpReward(), prompt.getIsAccepted(), TimeUtils.toOffsetDateTime(prompt.getDeadlineAt()),
+                TimeUtils.toOffsetDateTime(prompt.getReviewedAt()), TimeUtils.toOffsetDateTime(prompt.getSubmittedAt()),
+                assignedBy);
     }
 }

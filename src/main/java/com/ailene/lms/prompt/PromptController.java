@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -34,5 +35,15 @@ public class PromptController {
         UUID userId = authService.resolveUserId(jwt);
         PagedResponse<PromptListItem> response = promptService.list(userId, request);
         return ApiResponse.success(HttpStatus.OK, "prompts retrieved successfully", response);
+    }
+
+    @PostMapping("/assigned")
+    public ResponseEntity<ApiResponse<List<PromptAssignedItem>>> assigned(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PromptAssignedRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        List<PromptAssignedItem> response = promptService.listAssigned(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "assigned prompts retrieved successfully", response);
     }
 }

@@ -73,3 +73,68 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
+
+### `POST {base_url}/api/prompts/assigned`
+
+Returns the prompts a champion has assigned to the caller specifically (`lms_prompt_submissions.assigned_by_access_id IS NOT NULL`) — not the general library, and not self-initiated practice.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "project_id": "V7rdgcYkq9PHQZkwvoA-F",
+  "has_submitted": false,
+  "is_accepted": false
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `project_id` | string | yes | |
+| `has_submitted` | boolean | no | Omit for no filter. `true` → only prompts with `submitted_at` set. `false` → only prompts not yet submitted. |
+| `is_accepted` | boolean | no | Omit for no filter. Independent `AND` with `has_submitted` — not an OR/complementary toggle. |
+
+Common combos: `has_submitted: false` (+ optionally `is_accepted: false`, which is redundant but harmless since an unsubmitted prompt is never accepted) for a **to-do list**; `has_submitted: true` alone (omit `is_accepted`) for **submission history**, accepted or not.
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "assigned prompts retrieved successfully",
+  "data": [
+    {
+      "id": 2,
+      "name": "Interview Question Generator",
+      "description": "Anda akan mewawancarai kandidat untuk posisi Data Analyst...",
+      "categories": [
+        { "id": 87, "name": "Human Capital" }
+      ],
+      "xp_reward": 70,
+      "is_accepted": false,
+      "deadline_at": "2026-08-29T18:08:14.651505Z",
+      "reviewed_at": null,
+      "submitted_at": null,
+      "assigned_by": {
+        "id": "1df9f6b8-0911-4b65-acb6-3dc797bbe8e9",
+        "name": "Akmal Luthfiansyah",
+        "avatar": "https://lh3.googleusercontent.com/a/xxx"
+      }
+    }
+  ]
+}
+```
+
+Not paginated (this is always scoped to just the caller's own assignments). Sorted by `deadline_at` ascending. `xp_reward` is `lms_prompts.xp_reward` directly. `assigned_by` is the champion who made the assignment (their `lms_users` row via `assigned_by_access_id`).
+
+**Errors**
+
+Same shape and cases as `POST /api/prompts` above (missing/invalid auth, expired session, blank `project_id`), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for this `project_id` |

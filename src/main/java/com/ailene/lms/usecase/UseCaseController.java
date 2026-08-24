@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -34,5 +35,15 @@ public class UseCaseController {
         UUID userId = authService.resolveUserId(jwt);
         PagedResponse<UseCaseListItem> response = useCaseService.list(userId, request);
         return ApiResponse.success(HttpStatus.OK, "use cases retrieved successfully", response);
+    }
+
+    @PostMapping("/assigned")
+    public ResponseEntity<ApiResponse<List<UseCaseAssignedItem>>> assigned(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody UseCaseAssignedRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        List<UseCaseAssignedItem> response = useCaseService.listAssigned(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "assigned use cases retrieved successfully", response);
     }
 }
