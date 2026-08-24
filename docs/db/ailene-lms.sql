@@ -153,7 +153,8 @@ CREATE TABLE lms_levels (
   icon          VARCHAR          NULL,
   status        status_enum  NOT NULL  DEFAULT 'active',
   created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (id, project_id)
 );
 
 -- Contents
@@ -321,17 +322,25 @@ CREATE TABLE lms_groups (
 );
 
 CREATE TABLE lms_accesses (
-  id          CHAR(21)              PRIMARY KEY,
-  project_id  CHAR(21)              NOT NULL,
-  user_id     UUID                  NOT NULL,
-  group_id    INTEGER                   NULL,
-  role        lms_access_role_enum  NOT NULL,
-  created_at  TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  id                 CHAR(21)              PRIMARY KEY,
+  project_id         CHAR(21)              NOT NULL,
+  user_id            UUID                  NOT NULL,
+  group_id           INTEGER                   NULL,
+  current_level_id   INTEGER                   NULL,
+  role               lms_access_role_enum  NOT NULL,
+  created_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (project_id, user_id)
 );
 
 -- Submissions & Progress
+
+CREATE TABLE lms_level_history (
+  access_id   CHAR(21)     NOT NULL,
+  level_id    INTEGER      NOT NULL,
+  reached_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (access_id, level_id)
+);
 
 CREATE TABLE lms_coaching_notes (
   id                   SERIAL       PRIMARY KEY,
@@ -541,9 +550,14 @@ ALTER TABLE lms_groups
   ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
 
 ALTER TABLE lms_accesses
-  ADD FOREIGN KEY (project_id)           REFERENCES lms_projects (id),
-  ADD FOREIGN KEY (user_id)              REFERENCES lms_users (id),
-  ADD FOREIGN KEY (group_id, project_id) REFERENCES lms_groups (id, project_id);
+  ADD FOREIGN KEY (project_id)                   REFERENCES lms_projects (id),
+  ADD FOREIGN KEY (user_id)                      REFERENCES lms_users (id),
+  ADD FOREIGN KEY (group_id, project_id)         REFERENCES lms_groups (id, project_id),
+  ADD FOREIGN KEY (current_level_id, project_id) REFERENCES lms_levels (id, project_id);
+
+ALTER TABLE lms_level_history
+  ADD FOREIGN KEY (access_id) REFERENCES lms_accesses (id),
+  ADD FOREIGN KEY (level_id)  REFERENCES lms_levels (id);
 
 ALTER TABLE lms_coaching_notes
   ADD FOREIGN KEY (student_access_id)  REFERENCES lms_accesses (id),

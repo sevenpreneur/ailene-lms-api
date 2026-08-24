@@ -48,13 +48,17 @@ public class AuthService {
         return new AuthLoginResponse(jwt, UserDto.from(user));
     }
 
-    public CheckSessionResponse checkSession(String jwt) {
+    public UUID resolveUserId(String jwt) {
         Claims claims = jwtService.parse(jwt);
 
         tokenRepository.findByTokenAndActiveTrue(jwt)
                 .orElseThrow(() -> new UnauthorizedException("Session not found or already ended"));
 
-        UUID userId = UUID.fromString(claims.getSubject());
+        return UUID.fromString(claims.getSubject());
+    }
+
+    public CheckSessionResponse checkSession(String jwt) {
+        UUID userId = resolveUserId(jwt);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UnauthorizedException("Session not found or already ended"));
 
