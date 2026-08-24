@@ -4,6 +4,7 @@ import com.ailene.lms.chapter.ChapterListProjection;
 import com.ailene.lms.chapter.ChapterMethod;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 public record ChapterListItem(Integer id, String name, String description, OffsetDateTime sessionDate,
         Integer durationMinutes, String locationName, String locationUrl, ChapterMethod method,
@@ -26,8 +27,8 @@ public record ChapterListItem(Integer id, String name, String description, Offse
                 projection.getLevelName());
 
         return new ChapterListItem(projection.getId(), projection.getName(), projection.getDescription(),
-                projection.getSessionDate(), projection.getDurationMinutes(), projection.getLocationName(),
-                projection.getLocationUrl(), ChapterMethod.valueOf(projection.getMethod()), level, done, total,
-                progress);
+                projection.getSessionDate().atOffset(ZoneOffset.UTC), projection.getDurationMinutes(),
+                projection.getLocationName(), projection.getLocationUrl(),
+                ChapterMethod.valueOf(projection.getMethod()), level, done, total, progress);
     }
 }

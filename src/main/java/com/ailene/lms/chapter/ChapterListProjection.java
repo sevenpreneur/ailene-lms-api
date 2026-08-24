@@ -1,6 +1,6 @@
 package com.ailene.lms.chapter;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 public interface ChapterListProjection {
     Integer getId();
@@ -9,7 +9,7 @@ public interface ChapterListProjection {
 
     String getDescription();
 
-    OffsetDateTime getSessionDate();
+    Instant getSessionDate();
 
     Integer getDurationMinutes();
 
