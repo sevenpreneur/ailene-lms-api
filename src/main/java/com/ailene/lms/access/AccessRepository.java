@@ -10,6 +10,8 @@ import java.util.UUID;
 
 public interface AccessRepository extends JpaRepository<Access, String> {
 
+    Optional<Access> findByUserIdAndProjectId(UUID userId, String projectId);
+
     @Query(value = """
             SELECT p.id AS id,
                    p.name AS name,

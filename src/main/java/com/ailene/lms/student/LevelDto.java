@@ -1,4 +1,6 @@
-package com.ailene.lms.level;
+package com.ailene.lms.student;
+
+import com.ailene.lms.level.Level;
 
 public record LevelDto(Integer id, Short levelNumber, String name) {
 

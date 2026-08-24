@@ -1,4 +1,4 @@
-package com.ailene.lms.level;
+package com.ailene.lms.student;
 
 import jakarta.validation.constraints.NotBlank;
 
