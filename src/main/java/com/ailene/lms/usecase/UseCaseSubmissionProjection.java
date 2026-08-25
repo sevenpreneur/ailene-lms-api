@@ -9,5 +9,7 @@ public interface UseCaseSubmissionProjection {
 
     Instant getSubmittedAt();
 
+    Instant getReviewedAt();
+
     Boolean getIsAccepted();
 }

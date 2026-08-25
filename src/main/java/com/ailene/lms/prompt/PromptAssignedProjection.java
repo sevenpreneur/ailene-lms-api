@@ -10,6 +10,10 @@ public interface PromptAssignedProjection {
 
     String getDescription();
 
+    Integer getLevelId();
+
+    Short getLevelNumber();
+
     Short getXpReward();
 
     Instant getDeadlineAt();

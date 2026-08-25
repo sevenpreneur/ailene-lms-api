@@ -48,6 +48,7 @@ Returns a paginated, searchable list of a project's active, non-self-created pro
         ],
         "deadline_at": "2026-08-27T17:16:17.902873Z",
         "submitted_at": "2026-08-24T17:16:17.902873Z",
+        "reviewed_at": null,
         "is_accepted": true
       }
     ],
@@ -61,7 +62,7 @@ Returns a paginated, searchable list of a project's active, non-self-created pro
 }
 ```
 
-`description` is the prompt's `scenario` text. `categories` is an array (a prompt can belong to more than one). `deadline_at`/`submitted_at`/`is_accepted` reflect the caller's own submission for each prompt (from their `lms_accesses` row in this project) — all `null` if they have no submission yet, or if they have no access to this project at all. Sorted by `level_number` ascending, then `name` ascending. `metapaging` follows the same shape every future list endpoint in this API will use.
+`description` is the prompt's `scenario` text. `categories` is an array (a prompt can belong to more than one). `deadline_at`/`submitted_at`/`reviewed_at`/`is_accepted` reflect the caller's own submission for each prompt (from their `lms_accesses` row in this project) — all `null` if they have no submission yet, or if they have no access to this project at all. Sorted by `level_number` ascending, then `name` ascending. `metapaging` follows the same shape every future list endpoint in this API will use.
 
 **Errors**
 
@@ -111,6 +112,8 @@ Common combos: `has_submitted: false` (+ optionally `is_accepted: false`, which 
       "id": 2,
       "name": "Interview Question Generator",
       "description": "Anda akan mewawancarai kandidat untuk posisi Data Analyst...",
+      "level_id": 3,
+      "level_number": 2,
       "categories": [
         { "id": 87, "name": "Human Capital" }
       ],
@@ -129,7 +132,7 @@ Common combos: `has_submitted: false` (+ optionally `is_accepted: false`, which 
 }
 ```
 
-Not paginated (this is always scoped to just the caller's own assignments). Sorted by `deadline_at` ascending. `xp_reward` is `lms_prompts.xp_reward` directly. `assigned_by` is the champion who made the assignment (their `lms_users` row via `assigned_by_access_id`).
+Not paginated (this is always scoped to just the caller's own assignments). Sorted by `deadline_at` ascending. `xp_reward` is `lms_prompts.xp_reward` directly. `level_id`/`level_number` are the prompt's `lms_levels.id`/`level_number`. `assigned_by` is the champion who made the assignment (their `lms_users` row via `assigned_by_access_id`).
 
 **Errors**
 

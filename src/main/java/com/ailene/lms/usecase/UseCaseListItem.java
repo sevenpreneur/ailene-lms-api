@@ -7,5 +7,5 @@ import java.util.List;
 
 public record UseCaseListItem(Integer id, String name, String description, Short levelNumber,
         List<CategorySummary> categories, OffsetDateTime deadlineAt, OffsetDateTime submittedAt,
-        Boolean isAccepted) {
+        OffsetDateTime reviewedAt, Boolean isAccepted) {
 }

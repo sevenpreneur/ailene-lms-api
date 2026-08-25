@@ -51,6 +51,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             SELECT ps.prompt_id AS promptId,
                    ps.deadline AS deadlineAt,
                    ps.submitted_at AS submittedAt,
+                   ps.reviewed_at AS reviewedAt,
                    ps.is_accepted AS isAccepted
             FROM lms_prompt_submissions ps
             WHERE ps.student_access_id = :accessId AND ps.prompt_id IN (:promptIds)
@@ -62,6 +63,8 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             SELECT p.id AS id,
                    p.name AS name,
                    p.scenario AS description,
+                   lv.id AS levelId,
+                   lv.level_number AS levelNumber,
                    p.xp_reward AS xpReward,
                    ps.deadline AS deadlineAt,
                    ps.submitted_at AS submittedAt,

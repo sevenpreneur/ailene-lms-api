@@ -67,6 +67,7 @@ public class PromptService {
                 prompt.getLevelNumber(), categories == null ? List.of() : categories,
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getDeadlineAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
                 submission == null ? null : submission.getIsAccepted());
     }
 
@@ -94,9 +95,9 @@ public class PromptService {
         AssignedByUser assignedBy = prompt.getAssignedById() == null ? null
                 : new AssignedByUser(prompt.getAssignedById(), prompt.getAssignedByName(),
                         prompt.getAssignedByAvatar());
-        return new PromptAssignedItem(prompt.getId(), prompt.getName(), prompt.getDescription(), categories,
-                prompt.getXpReward(), prompt.getIsAccepted(), TimeUtils.toOffsetDateTime(prompt.getDeadlineAt()),
-                TimeUtils.toOffsetDateTime(prompt.getReviewedAt()), TimeUtils.toOffsetDateTime(prompt.getSubmittedAt()),
-                assignedBy);
+        return new PromptAssignedItem(prompt.getId(), prompt.getName(), prompt.getDescription(), prompt.getLevelId(),
+                prompt.getLevelNumber(), categories, prompt.getXpReward(), prompt.getIsAccepted(),
+                TimeUtils.toOffsetDateTime(prompt.getDeadlineAt()), TimeUtils.toOffsetDateTime(prompt.getReviewedAt()),
+                TimeUtils.toOffsetDateTime(prompt.getSubmittedAt()), assignedBy);
     }
 }

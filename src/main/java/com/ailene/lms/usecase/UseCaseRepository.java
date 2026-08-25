@@ -51,6 +51,7 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             SELECT us.use_case_id AS useCaseId,
                    us.deadline AS deadlineAt,
                    us.submitted_at AS submittedAt,
+                   us.reviewed_at AS reviewedAt,
                    us.is_accepted AS isAccepted
             FROM lms_use_case_submissions us
             WHERE us.student_access_id = :accessId AND us.use_case_id IN (:useCaseIds)
@@ -62,6 +63,8 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             SELECT u.id AS id,
                    u.name AS name,
                    u.description AS description,
+                   lv.id AS levelId,
+                   lv.level_number AS levelNumber,
                    u.xp_reward AS xpReward,
                    us.deadline AS deadlineAt,
                    us.submitted_at AS submittedAt,

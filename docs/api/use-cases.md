@@ -48,6 +48,7 @@ Returns a paginated, searchable list of a project's active, non-self-created use
         ],
         "deadline_at": "2026-08-29T17:28:16.541534Z",
         "submitted_at": "2026-08-24T17:28:16.541534Z",
+        "reviewed_at": null,
         "is_accepted": false
       }
     ],
@@ -61,7 +62,7 @@ Returns a paginated, searchable list of a project's active, non-self-created use
 }
 ```
 
-`description` is `lms_use_cases.description` directly. `categories` is an array (a use case can belong to more than one). `deadline_at`/`submitted_at`/`is_accepted` reflect the caller's own submission for each use case (from their `lms_accesses` row in this project) — all `null` if they have no submission yet, or if they have no access to this project at all. Sorted by `level_number` ascending, then `name` ascending. `metapaging` follows the same shape as every other paginated list endpoint in this API.
+`description` is `lms_use_cases.description` directly. `categories` is an array (a use case can belong to more than one). `deadline_at`/`submitted_at`/`reviewed_at`/`is_accepted` reflect the caller's own submission for each use case (from their `lms_accesses` row in this project) — all `null` if they have no submission yet, or if they have no access to this project at all. Sorted by `level_number` ascending, then `name` ascending. `metapaging` follows the same shape as every other paginated list endpoint in this API.
 
 **Errors**
 
@@ -111,6 +112,8 @@ Common combos: `has_submitted: false` (+ optionally `is_accepted: false`, which 
       "id": 1,
       "name": "Otomasi Screening CV Massal",
       "description": "Tim recruiter menerima ratusan CV untuk satu lowongan...",
+      "level_id": 3,
+      "level_number": 2,
       "categories": [
         { "id": 87, "name": "Human Capital" }
       ],
@@ -129,7 +132,7 @@ Common combos: `has_submitted: false` (+ optionally `is_accepted: false`, which 
 }
 ```
 
-Not paginated (this is always scoped to just the caller's own assignments). Sorted by `deadline_at` ascending. `xp_reward` is `lms_use_cases.xp_reward` directly. `assigned_by` is the champion who made the assignment (their `lms_users` row via `assigned_by_access_id`).
+Not paginated (this is always scoped to just the caller's own assignments). Sorted by `deadline_at` ascending. `xp_reward` is `lms_use_cases.xp_reward` directly. `level_id`/`level_number` are the use case's `lms_levels.id`/`level_number`. `assigned_by` is the champion who made the assignment (their `lms_users` row via `assigned_by_access_id`).
 
 **Errors**
 

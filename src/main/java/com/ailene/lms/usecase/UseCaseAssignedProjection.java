@@ -10,6 +10,10 @@ public interface UseCaseAssignedProjection {
 
     String getDescription();
 
+    Integer getLevelId();
+
+    Short getLevelNumber();
+
     Short getXpReward();
 
     Instant getDeadlineAt();

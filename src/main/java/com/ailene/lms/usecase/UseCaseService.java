@@ -67,6 +67,7 @@ public class UseCaseService {
                 useCase.getLevelNumber(), categories == null ? List.of() : categories,
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getDeadlineAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
                 submission == null ? null : submission.getIsAccepted());
     }
 
@@ -94,8 +95,9 @@ public class UseCaseService {
         AssignedByUser assignedBy = useCase.getAssignedById() == null ? null
                 : new AssignedByUser(useCase.getAssignedById(), useCase.getAssignedByName(),
                         useCase.getAssignedByAvatar());
-        return new UseCaseAssignedItem(useCase.getId(), useCase.getName(), useCase.getDescription(), categories,
-                useCase.getXpReward(), useCase.getIsAccepted(), TimeUtils.toOffsetDateTime(useCase.getDeadlineAt()),
+        return new UseCaseAssignedItem(useCase.getId(), useCase.getName(), useCase.getDescription(),
+                useCase.getLevelId(), useCase.getLevelNumber(), categories, useCase.getXpReward(),
+                useCase.getIsAccepted(), TimeUtils.toOffsetDateTime(useCase.getDeadlineAt()),
                 TimeUtils.toOffsetDateTime(useCase.getReviewedAt()),
                 TimeUtils.toOffsetDateTime(useCase.getSubmittedAt()), assignedBy);
     }

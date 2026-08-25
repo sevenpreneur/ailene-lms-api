@@ -9,5 +9,7 @@ public interface PromptSubmissionProjection {
 
     Instant getSubmittedAt();
 
+    Instant getReviewedAt();
+
     Boolean getIsAccepted();
 }
