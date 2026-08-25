@@ -29,4 +29,31 @@ public class LearningsController {
         LearningsResponse response = learningsService.getTasks(jwt, request);
         return ApiResponse.success(HttpStatus.OK, "learnings retrieved successfully", response);
     }
+
+    @PostMapping("/material-details")
+    public ResponseEntity<ApiResponse<MaterialDetailsResponse>> materialDetails(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody MaterialDetailsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        MaterialDetailsResponse response = learningsService.getMaterialDetails(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "material retrieved successfully", response);
+    }
+
+    @PostMapping("/video-details")
+    public ResponseEntity<ApiResponse<VideoDetailsResponse>> videoDetails(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody VideoDetailsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        VideoDetailsResponse response = learningsService.getVideoDetails(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "video retrieved successfully", response);
+    }
+
+    @PostMapping("/quiz-details")
+    public ResponseEntity<ApiResponse<QuizDetailsResponse>> quizDetails(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody QuizDetailsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        QuizDetailsResponse response = learningsService.getQuizDetails(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "quiz retrieved successfully", response);
+    }
 }

@@ -1,6 +1,6 @@
 # Learnings
 
-Endpoint for listing the quizzes, videos, and materials ("tasks") in one chapter, each annotated with the caller's own XP and completion status.
+Endpoints for listing the quizzes, videos, and materials ("tasks") in one chapter, and for reading a single one's full detail — each annotated with the caller's own XP and completion status.
 
 ## Endpoints
 
@@ -95,3 +95,175 @@ Example error response (`404 Not Found`):
   "message": "Chapter not found"
 }
 ```
+
+### `POST {base_url}/api/learnings/material-details`
+
+Returns one material's full body (`content`/`file_url`/`image_url` included — this is the detail view the list endpoint above deliberately omits them from), plus the caller's own completion status.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "material_id": "430bb86dc0edc244188fd9eb"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `material_id` | string | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "material retrieved successfully",
+  "data": {
+    "id": "430bb86dc0edc244188fd9eb",
+    "title": "Materi 1.1 — Orientasi & tetapkan target",
+    "description": null,
+    "content": "# F1.1 Orientasi dan Tetapkan Target\n\nSelamat datang di program adopsi AI...",
+    "file_url": null,
+    "image_url": null,
+    "xp_reward": 30,
+    "order_index": 1,
+    "chapter": { "id": 5, "name": "Paham AI & pakai dengan benar" },
+    "completed": false,
+    "completed_at": null,
+    "created_at": "2026-06-17T09:38:15.117Z",
+    "updated_at": "2026-06-20T08:22:22.098Z"
+  }
+}
+```
+
+`completed`/`completed_at` come from the caller's `lms_material_completions` row (`false`/`null` if not completed yet). Materials don't track `xp_earned` separately (same as the list endpoint) — their `xp_reward` is granted in full on completion. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
+
+**Errors**
+
+Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expired session), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
+
+### `POST {base_url}/api/learnings/video-details`
+
+Returns one video's full detail plus the caller's own completion status.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "video_id": 5
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `video_id` | integer | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "video retrieved successfully",
+  "data": {
+    "id": 5,
+    "title": "Sesi 1 — Fondasi: Cara Kerja AI & Pakai dengan Aman",
+    "description": null,
+    "video_url": "#",
+    "xp_reward": 15,
+    "order_index": 5,
+    "chapter": { "id": 5, "name": "Paham AI & pakai dengan benar" },
+    "completed": false,
+    "completed_at": null,
+    "created_at": "2026-06-17T09:38:15.117Z",
+    "updated_at": "2026-06-17T09:38:15.117Z"
+  }
+}
+```
+
+`completed`/`completed_at` come from `lms_video_completions`. `project_id` isn't part of the request — it's resolved internally from `video_id` via the video's chapter → level.
+
+**Errors**
+
+Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expired session), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
+
+### `POST {base_url}/api/learnings/quiz-details`
+
+Returns one quiz's detail plus its full question list — for taking the quiz, not for reviewing a past attempt. Each question's `is_correct` and `explanation` are deliberately withheld here so the answer key can't be read off this endpoint; they only surface once a submission exists (a future `quiz-submit`/`quiz-result`-style endpoint, not this one).
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "quiz_id": "aae34047a42dddbd82cf84f8"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `quiz_id` | string | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "quiz retrieved successfully",
+  "data": {
+    "id": "aae34047a42dddbd82cf84f8",
+    "name": "Quiz F1 — Fondasi AI",
+    "description": "Fondasi AI",
+    "order_index": 4,
+    "chapter": { "id": 5, "name": "Paham AI & pakai dengan benar" },
+    "question_count": 12,
+    "xp_reward": 60,
+    "attempts": 0,
+    "questions": [
+      {
+        "id": 101,
+        "question": "Pada dasarnya, sebuah LLM (Large Language Model) seperti Claude bekerja dengan cara apa saat menghasilkan jawaban?",
+        "order_index": 1,
+        "xp_reward": 5,
+        "options": [
+          { "id": 401, "option_code": "A", "text": "Mencari jawaban langsung dari basis data fakta yang selalu mutakhir" },
+          { "id": 402, "option_code": "B", "text": "Menebak token (kata) berikutnya yang paling mungkin berdasarkan pola teks sebelumnya" },
+          { "id": 403, "option_code": "C", "text": "Menghubungi internet secara langsung untuk setiap pertanyaan" },
+          { "id": 404, "option_code": "D", "text": "Menyalin kalimat utuh dari dokumen yang pernah dibacanya" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/learnings`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level.
+
+**Errors**
+
+Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expired session), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |

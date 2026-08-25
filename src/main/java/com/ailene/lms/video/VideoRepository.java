@@ -24,4 +24,10 @@ public interface VideoRepository extends JpaRepository<Video, Integer> {
             ORDER BY v.order_index ASC
             """, nativeQuery = true)
     List<VideoTaskProjection> findVideoTasks(@Param("chapterId") Integer chapterId, @Param("accessId") String accessId);
+
+    @Query(value = """
+            SELECT (SELECT vc.completed_at FROM lms_video_completions vc
+                      WHERE vc.student_access_id = :accessId AND vc.video_id = :videoId) AS completedAt
+            """, nativeQuery = true)
+    VideoCompletionProjection findCompletion(@Param("videoId") Integer videoId, @Param("accessId") String accessId);
 }

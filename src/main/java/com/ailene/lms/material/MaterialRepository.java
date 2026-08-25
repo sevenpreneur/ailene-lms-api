@@ -22,4 +22,11 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
             """, nativeQuery = true)
     List<MaterialTaskProjection> findMaterialTasks(@Param("chapterId") Integer chapterId,
             @Param("accessId") String accessId);
+
+    @Query(value = """
+            SELECT (SELECT mc.completed_at FROM lms_material_completions mc
+                      WHERE mc.student_access_id = :accessId AND mc.material_id = :materialId) AS completedAt
+            """, nativeQuery = true)
+    MaterialCompletionProjection findCompletion(@Param("materialId") String materialId,
+            @Param("accessId") String accessId);
 }
