@@ -4,7 +4,7 @@ Instructions for coding agents (Claude Code, Codex, or others) working in this r
 
 ## What this is
 
-Ailene LMS backend: a Spring Boot REST API for the LMS module of a larger Neon Postgres database (the same project also hosts a separate CRM/B2B module and an account/identity service — see Database below). Deployed on Railway.
+Ailene LMS API: a Spring Boot REST API for the LMS module of a larger Neon Postgres database (the same project also hosts a separate CRM/B2B module and an account/identity service — see Database below). Deployed on Railway.
 
 ## Stack
 
