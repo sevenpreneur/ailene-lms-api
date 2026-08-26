@@ -88,4 +88,29 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
     List<UseCaseAssignedProjection> findAssignedUseCases(@Param("projectId") String projectId,
             @Param("accessId") String accessId, @Param("hasSubmitted") Boolean hasSubmitted,
             @Param("isAccepted") Boolean isAccepted);
+
+    @Query(value = """
+            SELECT us.hours_with_ai AS hoursWithAi, us.hours_without_ai AS hoursWithoutAi, us.ai_tool AS aiTool
+            FROM lms_use_case_submissions us
+            JOIN lms_use_cases u ON u.id = us.use_case_id
+            JOIN lms_levels lv ON lv.id = u.level_id
+            WHERE lv.project_id = :projectId AND us.student_access_id = :accessId AND us.is_accepted = true
+            """, nativeQuery = true)
+    List<UseCaseAchievementProjection> findApprovedAchievements(@Param("projectId") String projectId,
+            @Param("accessId") String accessId);
+
+    @Query(value = """
+            SELECT us.ai_tool AS aiTool,
+                   us.outcome_proof AS outcomeProof,
+                   us.type AS type,
+                   us.is_accepted AS isAccepted,
+                   us.hours_with_ai AS hoursWithAi,
+                   us.hours_without_ai AS hoursWithoutAi
+            FROM lms_use_case_submissions us
+            JOIN lms_use_cases u ON u.id = us.use_case_id
+            JOIN lms_levels lv ON lv.id = u.level_id
+            WHERE lv.project_id = :projectId AND us.student_access_id = :accessId AND us.submitted_at IS NOT NULL
+            """, nativeQuery = true)
+    List<UseCaseCompetencyProjection> findCompetencySubmissions(@Param("projectId") String projectId,
+            @Param("accessId") String accessId);
 }

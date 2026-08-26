@@ -95,4 +95,17 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             ORDER BY qq.order_index ASC, qo.option_code ASC
             """, nativeQuery = true)
     List<QuizResultQuestionOptionProjection> findQuestionsWithAnswerKey(@Param("quizId") String quizId);
+
+    @Query(value = """
+            SELECT AVG(best_score) FROM (
+              SELECT qs.quiz_id, MAX(qs.score) AS best_score
+              FROM lms_quiz_submissions qs
+              JOIN lms_quizzes q ON q.id = qs.quiz_id
+              JOIN lms_chapters c ON c.id = q.chapter_id
+              JOIN lms_levels lv ON lv.id = c.level_id
+              WHERE lv.project_id = :projectId AND qs.student_access_id = :accessId AND qs.is_completed = true
+              GROUP BY qs.quiz_id
+            ) t
+            """, nativeQuery = true)
+    Double findAverageBestScore(@Param("projectId") String projectId, @Param("accessId") String accessId);
 }

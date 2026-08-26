@@ -29,4 +29,31 @@ public class StudentController {
         StudentStatusResponse response = studentService.getStatus(jwt, request);
         return ApiResponse.success(HttpStatus.OK, "student status retrieved successfully", response);
     }
+
+    @PostMapping("/level-progress")
+    public ResponseEntity<ApiResponse<LevelProgressResponse>> levelProgress(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody LevelProgressRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        LevelProgressResponse response = studentService.getLevelProgress(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "level progress retrieved successfully", response);
+    }
+
+    @PostMapping("/competency")
+    public ResponseEntity<ApiResponse<CompetencyProfileResponse>> competency(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody CompetencyRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        CompetencyProfileResponse response = studentService.getCompetencyProfile(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "competency profile retrieved successfully", response);
+    }
+
+    @PostMapping("/leaderboard")
+    public ResponseEntity<ApiResponse<LeaderboardResponse>> leaderboard(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody LeaderboardRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        LeaderboardResponse response = studentService.getLeaderboard(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "leaderboard retrieved successfully", response);
+    }
 }

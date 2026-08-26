@@ -88,4 +88,28 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
     List<PromptAssignedProjection> findAssignedPrompts(@Param("projectId") String projectId,
             @Param("accessId") String accessId, @Param("hasSubmitted") Boolean hasSubmitted,
             @Param("isAccepted") Boolean isAccepted);
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM lms_prompt_submissions ps
+            JOIN lms_prompts p ON p.id = ps.prompt_id
+            JOIN lms_levels lv ON lv.id = p.level_id
+            WHERE lv.project_id = :projectId AND ps.student_access_id = :accessId AND ps.is_accepted = true
+            """, nativeQuery = true)
+    long countApprovedSubmissions(@Param("projectId") String projectId, @Param("accessId") String accessId);
+
+    @Query(value = """
+            SELECT ps.reviewed_at AS reviewedAt,
+                   ps.rubric_specificity AS rubricSpecificity,
+                   ps.rubric_context AS rubricContext,
+                   ps.rubric_constraints AS rubricConstraints,
+                   ps.rubric_examples AS rubricExamples,
+                   ps.rubric_iteration AS rubricIteration
+            FROM lms_prompt_submissions ps
+            JOIN lms_prompts p ON p.id = ps.prompt_id
+            JOIN lms_levels lv ON lv.id = p.level_id
+            WHERE lv.project_id = :projectId AND ps.student_access_id = :accessId AND ps.submitted_at IS NOT NULL
+            """, nativeQuery = true)
+    List<PromptCompetencyProjection> findCompetencySubmissions(@Param("projectId") String projectId,
+            @Param("accessId") String accessId);
 }
