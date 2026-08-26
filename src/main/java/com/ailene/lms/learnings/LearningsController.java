@@ -57,6 +57,15 @@ public class LearningsController {
         return ApiResponse.success(HttpStatus.OK, "quiz retrieved successfully", response);
     }
 
+    @PostMapping("/materials")
+    public ResponseEntity<ApiResponse<LevelMaterialsResponse>> levelMaterials(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody LevelMaterialsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        LevelMaterialsResponse response = learningsService.getLevelMaterials(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "level materials retrieved successfully", response);
+    }
+
     @PostMapping("/material-completion")
     public ResponseEntity<ApiResponse<MaterialCompletionResponse>> materialCompletion(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,

@@ -268,6 +268,68 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 
+### `POST {base_url}/api/learnings/materials`
+
+Returns every active material in the same level as the given material — the "other modules in this level" sidebar — each numbered sequentially across chapters and annotated with the caller's completion and lock status.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "material_id": "430bb86dc0edc244188fd9eb"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `material_id` | string | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "level materials retrieved successfully",
+  "data": {
+    "level_number": 1,
+    "materials": [
+      {
+        "id": "430bb86dc0edc244188fd9eb",
+        "title": "Materi 1.1 — Orientasi & tetapkan target",
+        "index": 1,
+        "completed": true,
+        "locked": false,
+        "is_current": true
+      },
+      {
+        "id": "b8e2f1a4c0edc244188fd9ec",
+        "title": "Materi 1.2 — Praktik",
+        "index": 2,
+        "completed": false,
+        "locked": true,
+        "is_current": false
+      }
+    ]
+  }
+}
+```
+
+`material_id`'s chapter → level determines the level being listed; `level_number` is that level's number. `materials` covers every active material across every active chapter of that level, ordered by the chapter's `session_date` ascending then the material's `order_index` ascending, with `index` numbered sequentially across that whole ordering (not reset per chapter). `completed` comes from the caller's `lms_material_completions` rows. `locked` is `true` unless both: (1) the level is unlocked — the level's `level_number` is at or below the caller's `lms_accesses.current_level_id` level number — and (2) that material's chapter `session_date` has already started. `is_current` flags the material matching the request's `material_id`. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
+
+**Errors**
+
+Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expired session), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
+| 404 | `NOT_FOUND` | `Level not found` | the material's chapter references a level that no longer exists |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
+
 ### `POST {base_url}/api/learnings/material-completion`
 
 Marks a material complete for the caller and awards its XP. Idempotent — calling it again for an already-completed material still returns `completed: true` with the original `completed_at`, but `xp_awarded` is `0` since the XP was already granted.

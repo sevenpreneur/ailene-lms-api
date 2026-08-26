@@ -31,6 +31,21 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
     MaterialCompletionProjection findCompletion(@Param("materialId") String materialId,
             @Param("accessId") String accessId);
 
+    @Query(value = """
+            SELECT c.session_date AS sessionDate,
+                   m.id AS materialId,
+                   m.title AS materialTitle,
+                   m.order_index AS orderIndex,
+                   EXISTS (SELECT 1 FROM lms_material_completions mc
+                      WHERE mc.student_access_id = :accessId AND mc.material_id = m.id) AS completed
+            FROM lms_chapters c
+            JOIN lms_materials m ON m.chapter_id = c.id AND m.status = 'active'
+            WHERE c.level_id = :levelId AND c.status = 'active'
+            ORDER BY c.session_date ASC, m.order_index ASC
+            """, nativeQuery = true)
+    List<LevelMaterialProjection> findLevelMaterials(@Param("levelId") Integer levelId,
+            @Param("accessId") String accessId);
+
     @Modifying
     @Query(value = """
             INSERT INTO lms_material_completions (student_access_id, material_id)

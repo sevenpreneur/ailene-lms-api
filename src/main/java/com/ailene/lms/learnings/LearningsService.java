@@ -2,6 +2,7 @@ package com.ailene.lms.learnings;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
+import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
 import com.ailene.lms.chapter.ChapterRepository;
@@ -10,6 +11,7 @@ import com.ailene.lms.common.TimeUtils;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
+import com.ailene.lms.material.LevelMaterialProjection;
 import com.ailene.lms.material.Material;
 import com.ailene.lms.material.MaterialRepository;
 import com.ailene.lms.quiz.Quiz;
@@ -121,6 +123,37 @@ public class LearningsService {
         return new QuizDetailsResponse(quiz.getId(), quiz.getName(), quiz.getDescription(), quiz.getOrderIndex(),
                 new ChapterSummary(chapter.getId(), chapter.getName()), stats.getQuestionCount(),
                 stats.getXpReward(), stats.getAttempts(), questions);
+    }
+
+    public LevelMaterialsResponse getLevelMaterials(String jwt, LevelMaterialsRequest request) {
+        UUID userId = authService.resolveUserId(jwt);
+
+        Material current = materialRepository.findById(request.materialId())
+                .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
+        Chapter chapter = resolveChapter(current.getChapterId());
+        Access access = resolveAccess(userId, chapter);
+
+        Level level = levelRepository.findById(chapter.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+
+        StudentStatusProjection status = accessRepository.findStudentStatus(userId, level.getProjectId())
+                .orElse(null);
+        short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
+                : status.getCurrentLevelNumber();
+        boolean levelUnlocked = level.getLevelNumber() <= currentLevelNumber;
+
+        Instant now = Instant.now();
+        List<LevelMaterialItem> materials = new ArrayList<>();
+        int index = 0;
+        for (LevelMaterialProjection row : materialRepository.findLevelMaterials(level.getId(), access.getId())) {
+            index++;
+            boolean sessionStarted = !row.getSessionDate().isAfter(now);
+            boolean unlocked = levelUnlocked && sessionStarted;
+            materials.add(new LevelMaterialItem(row.getMaterialId(), row.getMaterialTitle(), index,
+                    row.getCompleted(), !unlocked, row.getMaterialId().equals(request.materialId())));
+        }
+
+        return new LevelMaterialsResponse(level.getLevelNumber(), materials);
     }
 
     @Transactional
