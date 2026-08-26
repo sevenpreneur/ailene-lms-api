@@ -140,7 +140,7 @@ Returns one material's full body (`content`/`file_url`/`image_url` included — 
 }
 ```
 
-`completed`/`completed_at` come from the caller's `lms_material_completions` row (`false`/`null` if not completed yet). Materials don't track `xp_earned` separately (same as the list endpoint) — their `xp_reward` is granted in full on completion. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
+`completed`/`completed_at` come from the caller's `lms_material_completions` row (`false`/`null` if not completed yet). Materials don't track `xp_earned` separately (same as the list endpoint) — their `xp_reward` is granted in full on completion. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level. The material's level must already be unlocked for the caller (see `Level not unlocked yet` below) — this applies to every access role, not students only.
 
 **Errors**
 
@@ -150,6 +150,7 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
+| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the material's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
 
 ### `POST {base_url}/api/learnings/video-details`
 
@@ -193,7 +194,7 @@ Returns one video's full detail plus the caller's own completion status.
 }
 ```
 
-`completed`/`completed_at` come from `lms_video_completions`. `project_id` isn't part of the request — it's resolved internally from `video_id` via the video's chapter → level.
+`completed`/`completed_at` come from `lms_video_completions`. `project_id` isn't part of the request — it's resolved internally from `video_id` via the video's chapter → level. Same level-unlock requirement as `material-details` above.
 
 **Errors**
 
@@ -203,6 +204,7 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
+| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the video's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
 
 ### `POST {base_url}/api/learnings/quiz-details`
 
@@ -257,7 +259,7 @@ Returns one quiz's detail plus its full question list — for taking the quiz, n
 }
 ```
 
-`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/learnings`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level.
+`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/learnings`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level. Same level-unlock requirement as `material-details` above.
 
 **Errors**
 
@@ -267,6 +269,7 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
+| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the quiz's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
 
 ### `POST {base_url}/api/learnings/materials`
 
@@ -365,7 +368,7 @@ Marks a material complete for the caller and awards its XP. Idempotent — calli
 }
 ```
 
-`completed` is always `true` on success. `completed_at` is the timestamp of the *first* completion — replaying this call doesn't move it. `xp_awarded` is the material's `xp_reward` on first completion, `0` on every call after that (XP is granted once per `(access, material)`, backed by `lms_xp_earnings`'s unique constraint).
+`completed` is always `true` on success. `completed_at` is the timestamp of the *first* completion — replaying this call doesn't move it. `xp_awarded` is the material's `xp_reward` on first completion, `0` on every call after that (XP is granted once per `(access, material)`, backed by `lms_xp_earnings`'s unique constraint). Same level-unlock requirement as `material-details` above — this blocks completing (and farming XP from) a material whose level isn't open yet, not just viewing it.
 
 **Errors**
 
@@ -375,6 +378,7 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
+| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the material's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
 
 ### `POST {base_url}/api/learnings/video-completion`
 
@@ -411,7 +415,7 @@ Marks a video complete for the caller and awards its XP. Same idempotency behavi
 }
 ```
 
-`completed`/`completed_at`/`xp_awarded` follow the same rules as `material-completion` above.
+`completed`/`completed_at`/`xp_awarded` follow the same rules as `material-completion` above, including the level-unlock requirement.
 
 **Errors**
 
@@ -421,3 +425,4 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
+| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the video's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
