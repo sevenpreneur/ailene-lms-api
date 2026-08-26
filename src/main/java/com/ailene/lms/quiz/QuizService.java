@@ -96,7 +96,7 @@ public class QuizService {
         created.setSubmittedAt(now);
         created = quizSubmissionRepository.save(created);
 
-        qStashClient.publishDelayed("/api/quizzes/auto-submit", new QuizAutoSubmitRequest(created.getId()),
+        qStashClient.publishDelayed("/api/v1/quizzes/auto-submit", new QuizAutoSubmitRequest(created.getId()),
                 QUIZ_DURATION_SECONDS);
 
         return QuizAttemptResponse.active(created.getId(), now, now, QUIZ_DURATION_SECONDS, created.getAnswers());
