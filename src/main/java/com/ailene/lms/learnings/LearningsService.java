@@ -5,7 +5,9 @@ import com.ailene.lms.access.AccessRepository;
 import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterListProjection;
 import com.ailene.lms.chapter.ChapterRepository;
+import com.ailene.lms.common.Status;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
@@ -52,6 +54,25 @@ public class LearningsService {
                 .toList();
 
         return new LearningsResponse(quizzes, videos, materials);
+    }
+
+    public List<ChapterListItem> getChapters(String jwt, ChapterListRequest request) {
+        UUID userId = authService.resolveUserId(jwt);
+
+        Access access = accessRepository.findByUserIdAndProjectId(userId, request.projectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+
+        List<ChapterListProjection> rows = chapterRepository.findChapterList(request.projectId(), access.getId());
+        return rows.stream().map(ChapterListItem::from).toList();
+    }
+
+    public List<LevelDto> getLevels(String jwt, LevelListRequest request) {
+        authService.resolveUserId(jwt);
+
+        return levelRepository.findByProjectIdAndStatusOrderByLevelNumberAsc(request.projectId(), Status.active)
+                .stream()
+                .map(LevelDto::from)
+                .toList();
     }
 
     public LevelMaterialsResponse getLevelMaterials(String jwt, LevelMaterialsRequest request) {

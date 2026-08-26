@@ -13,8 +13,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/student")
 @RequiredArgsConstructor
@@ -30,23 +28,5 @@ public class StudentController {
         String jwt = secretKeyGuard.extractBearerToken(authorization);
         StudentStatusResponse response = studentService.getStatus(jwt, request);
         return ApiResponse.success(HttpStatus.OK, "student status retrieved successfully", response);
-    }
-
-    @PostMapping("/chapters")
-    public ResponseEntity<ApiResponse<List<ChapterListItem>>> chapters(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody ChapterListRequest request) {
-        String jwt = secretKeyGuard.extractBearerToken(authorization);
-        List<ChapterListItem> response = studentService.getChapters(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "chapters retrieved successfully", response);
-    }
-
-    @PostMapping("/levels")
-    public ResponseEntity<ApiResponse<List<LevelDto>>> levels(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody LevelListRequest request) {
-        String jwt = secretKeyGuard.extractBearerToken(authorization);
-        List<LevelDto> response = studentService.getLevels(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "levels retrieved successfully", response);
     }
 }

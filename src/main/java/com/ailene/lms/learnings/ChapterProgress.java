@@ -1,4 +1,4 @@
-package com.ailene.lms.student;
+package com.ailene.lms.learnings;
 
 public enum ChapterProgress {
     not_started,
