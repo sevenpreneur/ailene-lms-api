@@ -38,4 +38,13 @@ public class MaterialController {
         MaterialCompletionResponse response = materialService.completeMaterial(jwt, request);
         return ApiResponse.success(HttpStatus.OK, "material completed successfully", response);
     }
+
+    @PostMapping("/in-level")
+    public ResponseEntity<ApiResponse<LevelMaterialsResponse>> inLevel(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody LevelMaterialsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        LevelMaterialsResponse response = materialService.getLevelMaterials(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "level materials retrieved successfully", response);
+    }
 }

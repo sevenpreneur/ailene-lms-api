@@ -16,6 +16,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -231,5 +233,112 @@ class MaterialServiceTest {
 
         assertThat(response.completed()).isTrue();
         assertThat(response.xpAwarded()).isEqualTo((short) 0);
+    }
+
+    @Test
+    void levelMaterials_ordersAcrossChaptersAndLocksUnstartedSessions() {
+        UUID userId = UUID.randomUUID();
+        when(authService.resolveUserId("jwt")).thenReturn(userId);
+
+        Material current = new Material();
+        current.setId("mat-2");
+        current.setChapterId(2);
+        when(materialRepository.findById("mat-2")).thenReturn(Optional.of(current));
+
+        Chapter chapter = new Chapter();
+        chapter.setId(2);
+        chapter.setLevelId(1);
+        chapter.setName("Chapter 2");
+        when(chapterRepository.findById(2)).thenReturn(Optional.of(chapter));
+
+        Level level = new Level();
+        level.setId(1);
+        level.setProjectId("proj-1");
+        level.setLevelNumber((short) 2);
+        when(levelRepository.findById(1)).thenReturn(Optional.of(level));
+
+        Access access = new Access();
+        access.setId("access-1");
+        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
+
+        StudentStatusProjection status = mock(StudentStatusProjection.class);
+        when(status.getCurrentLevelNumber()).thenReturn((short) 2);
+        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.of(status));
+
+        LevelMaterialProjection row1 = mock(LevelMaterialProjection.class);
+        when(row1.getMaterialId()).thenReturn("mat-1");
+        when(row1.getMaterialTitle()).thenReturn("M1");
+        when(row1.getSessionDate()).thenReturn(Instant.now().minus(1, ChronoUnit.DAYS));
+        when(row1.getCompleted()).thenReturn(true);
+
+        LevelMaterialProjection row2 = mock(LevelMaterialProjection.class);
+        when(row2.getMaterialId()).thenReturn("mat-2");
+        when(row2.getMaterialTitle()).thenReturn("M2");
+        when(row2.getSessionDate()).thenReturn(Instant.now().plus(1, ChronoUnit.DAYS));
+        when(row2.getCompleted()).thenReturn(false);
+
+        when(materialRepository.findLevelMaterials(1, "access-1")).thenReturn(List.of(row1, row2));
+
+        LevelMaterialsResponse response = materialService.getLevelMaterials("jwt",
+                new LevelMaterialsRequest("mat-2"));
+
+        assertThat(response.levelNumber()).isEqualTo((short) 2);
+        assertThat(response.materials()).hasSize(2);
+
+        LevelMaterialItem first = response.materials().get(0);
+        assertThat(first.id()).isEqualTo("mat-1");
+        assertThat(first.index()).isEqualTo(1);
+        assertThat(first.completed()).isTrue();
+        assertThat(first.locked()).isFalse();
+        assertThat(first.isCurrent()).isFalse();
+
+        LevelMaterialItem second = response.materials().get(1);
+        assertThat(second.id()).isEqualTo("mat-2");
+        assertThat(second.index()).isEqualTo(2);
+        assertThat(second.completed()).isFalse();
+        assertThat(second.locked()).isTrue();
+        assertThat(second.isCurrent()).isTrue();
+    }
+
+    @Test
+    void levelMaterials_levelNotYetUnlocked_locksEveryItem() {
+        UUID userId = UUID.randomUUID();
+        when(authService.resolveUserId("jwt")).thenReturn(userId);
+
+        Material current = new Material();
+        current.setId("mat-1");
+        current.setChapterId(1);
+        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(current));
+
+        Chapter chapter = new Chapter();
+        chapter.setId(1);
+        chapter.setLevelId(3);
+        chapter.setName("Chapter 1");
+        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
+
+        Level level = new Level();
+        level.setId(3);
+        level.setProjectId("proj-1");
+        level.setLevelNumber((short) 3);
+        when(levelRepository.findById(3)).thenReturn(Optional.of(level));
+
+        Access access = new Access();
+        access.setId("access-1");
+        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
+
+        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
+
+        LevelMaterialProjection row = mock(LevelMaterialProjection.class);
+        when(row.getMaterialId()).thenReturn("mat-1");
+        when(row.getMaterialTitle()).thenReturn("M1");
+        when(row.getSessionDate()).thenReturn(Instant.now().minus(1, ChronoUnit.DAYS));
+        when(row.getCompleted()).thenReturn(false);
+        when(materialRepository.findLevelMaterials(3, "access-1")).thenReturn(List.of(row));
+
+        LevelMaterialsResponse response = materialService.getLevelMaterials("jwt",
+                new LevelMaterialsRequest("mat-1"));
+
+        assertThat(response.materials()).hasSize(1);
+        assertThat(response.materials().get(0).locked()).isTrue();
     }
 }

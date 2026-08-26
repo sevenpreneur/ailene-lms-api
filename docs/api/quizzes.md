@@ -57,11 +57,11 @@ Returns one quiz's detail plus its full question list — for taking the quiz, n
 }
 ```
 
-`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/v1/learnings`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level. The quiz's level must already be unlocked for the caller (see `Level not unlocked yet` below).
+`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/v1/learnings/task`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level. The quiz's level must already be unlocked for the caller (see `Level not unlocked yet` below).
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` (missing/invalid auth, expired session — see `docs/api/learnings.md`), plus:
+Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, expired session — see `docs/api/learnings.md`), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
@@ -129,7 +129,7 @@ Starts a new quiz attempt, or resumes the caller's existing in-progress draft fo
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` (missing/invalid auth, expired session), plus:
+Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, expired session), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
@@ -173,7 +173,7 @@ Autosaves answers to the caller's active (not yet completed) draft for a quiz �
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` (missing/invalid auth, expired session), plus:
+Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, expired session), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
@@ -217,7 +217,7 @@ Finalizes a quiz attempt: scores the given answers against the answer key, marks
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` (missing/invalid auth, expired session), plus:
+Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, expired session), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
@@ -284,7 +284,7 @@ Returns the caller's most recent **completed** attempt for a quiz (highest `atte
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` (missing/invalid auth, expired session), plus:
+Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, expired session), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|

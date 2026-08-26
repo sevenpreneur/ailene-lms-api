@@ -50,7 +50,7 @@ Returns one video's full detail plus the caller's own completion status.
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` above (missing/invalid auth, expired session — see `docs/api/learnings.md`), plus:
+Same shape and cases as `POST /api/v1/learnings/task` above (missing/invalid auth, expired session — see `docs/api/learnings.md`), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
@@ -97,7 +97,7 @@ Marks a video complete for the caller and awards its XP. Same idempotency behavi
 
 **Errors**
 
-Same shape and cases as `POST /api/v1/learnings` above (missing/invalid auth, expired session), plus:
+Same shape and cases as `POST /api/v1/learnings/task` above (missing/invalid auth, expired session), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|

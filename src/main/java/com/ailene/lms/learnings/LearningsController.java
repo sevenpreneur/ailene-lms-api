@@ -23,13 +23,13 @@ public class LearningsController {
     private final LearningsService learningsService;
     private final SecretKeyGuard secretKeyGuard;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<LearningsResponse>> tasks(
+    @PostMapping("/levels")
+    public ResponseEntity<ApiResponse<List<LevelDto>>> levels(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody LearningsRequest request) {
+            @Valid @RequestBody LevelListRequest request) {
         String jwt = secretKeyGuard.extractBearerToken(authorization);
-        LearningsResponse response = learningsService.getTasks(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "learnings retrieved successfully", response);
+        List<LevelDto> response = learningsService.getLevels(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "levels retrieved successfully", response);
     }
 
     @PostMapping("/chapters")
@@ -41,21 +41,12 @@ public class LearningsController {
         return ApiResponse.success(HttpStatus.OK, "chapters retrieved successfully", response);
     }
 
-    @PostMapping("/levels")
-    public ResponseEntity<ApiResponse<List<LevelDto>>> levels(
+    @PostMapping("/task")
+    public ResponseEntity<ApiResponse<LearningsResponse>> tasks(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody LevelListRequest request) {
+            @Valid @RequestBody LearningsRequest request) {
         String jwt = secretKeyGuard.extractBearerToken(authorization);
-        List<LevelDto> response = learningsService.getLevels(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "levels retrieved successfully", response);
-    }
-
-    @PostMapping("/materials")
-    public ResponseEntity<ApiResponse<LevelMaterialsResponse>> levelMaterials(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody LevelMaterialsRequest request) {
-        String jwt = secretKeyGuard.extractBearerToken(authorization);
-        LevelMaterialsResponse response = learningsService.getLevelMaterials(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "level materials retrieved successfully", response);
+        LearningsResponse response = learningsService.getTasks(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "learnings retrieved successfully", response);
     }
 }

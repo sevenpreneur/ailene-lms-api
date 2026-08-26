@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -69,6 +71,36 @@ public class MaterialService {
 
         return new MaterialCompletionResponse(material.getId(), true, TimeUtils.toOffsetDateTime(completedAt),
                 xpAwarded);
+    }
+
+    public LevelMaterialsResponse getLevelMaterials(String jwt, LevelMaterialsRequest request) {
+        UUID userId = authService.resolveUserId(jwt);
+
+        Material current = materialRepository.findById(request.materialId())
+                .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
+        Chapter chapter = resolveChapter(current.getChapterId());
+        AccessContext ctx = resolveAccess(userId, chapter);
+        Access access = ctx.access();
+        Level level = ctx.level();
+
+        StudentStatusProjection status = accessRepository.findStudentStatus(userId, level.getProjectId())
+                .orElse(null);
+        short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
+                : status.getCurrentLevelNumber();
+        boolean levelUnlocked = level.getLevelNumber() <= currentLevelNumber;
+
+        Instant now = Instant.now();
+        List<LevelMaterialItem> materials = new ArrayList<>();
+        int index = 0;
+        for (LevelMaterialProjection row : materialRepository.findLevelMaterials(level.getId(), access.getId())) {
+            index++;
+            boolean sessionStarted = !row.getSessionDate().isAfter(now);
+            boolean unlocked = levelUnlocked && sessionStarted;
+            materials.add(new LevelMaterialItem(row.getMaterialId(), row.getMaterialTitle(), index,
+                    row.getCompleted(), !unlocked, row.getMaterialId().equals(request.materialId())));
+        }
+
+        return new LevelMaterialsResponse(level.getLevelNumber(), materials);
     }
 
     private Chapter resolveChapter(Integer chapterId) {

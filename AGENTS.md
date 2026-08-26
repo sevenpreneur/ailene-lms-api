@@ -14,7 +14,7 @@ Java 21, Spring Boot 4.1.0 (`spring-boot-starter-web`, `spring-boot-starter-data
 
 1. Copy `.env.example` to `.env` and fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (Neon Postgres), `GOOGLE_OAUTH_ID`, and `SECRET_KEY` (any random string — it's the static token `POST /api/v1/auth/login/google` checks, see `docs/api/auth.md`). `PORT` is optional, defaults to `8080`.
 2. `./mvnw spring-boot:run` — serves on `:$PORT`. `.env` is loaded automatically (see `LmsApplication.loadDotenv()`); no manual export needed, and it never overrides a var that's already set in the real environment.
-3. `LmsApplicationTests` is just the default `contextLoads()` placeholder, and it boots the full Spring context (needs a live DB connection since `ddl-auto: validate`) — but real unit tests do exist per-feature now (Mockito, no Spring context; see `learnings.LearningsServiceTest` for the pattern). `./mvnw test` picks up `.env` automatically for the `@SpringBootTest` ones — see the note in Conventions about why that needed its own static block instead of just relying on `LmsApplication`'s. There is no linter configured in `pom.xml`.
+3. `LmsApplicationTests` is just the default `contextLoads()` placeholder, and it boots the full Spring context (needs a live DB connection since `ddl-auto: validate`) — but real unit tests do exist per-feature now (Mockito, no Spring context; see `material.MaterialServiceTest` for the pattern). `./mvnw test` picks up `.env` automatically for the `@SpringBootTest` ones — see the note in Conventions about why that needed its own static block instead of just relying on `LmsApplication`'s. There is no linter configured in `pom.xml`.
 
 ## Project structure
 
@@ -27,7 +27,7 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 | `auth` | Google login, session check, and logout (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleUserInfo`, `JwtService`, `GoogleLoginRequest`, `AuthLoginResponse`, `CheckSessionResponse`) and its `Token`/`TokenRepository` |
 | `access` | `Access` entity (`lms_accesses` — a user's role on a project: champion/student/sponsor) + `AccessRepository`, whose native query joins `lms_projects` and the external `b2b_company` table to build `ProjectAccessDto` for `auth.CheckSessionResponse` |
 | `hello` | `HelloController` — `POST /api/v1/hello-world`, a `SECRET_KEY`-gated smoke-test endpoint with no other purpose |
-| `material` | `Material` entity + `/api/v1/materials/*` endpoints (`MaterialController`, `MaterialService`) — reading one material's full detail and marking it complete; listing lives in `learnings` |
+| `material` | `Material` entity + `/api/v1/materials/*` endpoints (`MaterialController`, `MaterialService`) — reading one material's full detail, marking it complete, and listing every material in the same level (`in-level`); listing materials per chapter lives in `learnings` |
 | `video` | `Video` entity + `/api/v1/videos/*` endpoints (`VideoController`, `VideoService`) — reading one video's full detail and marking it complete; listing lives in `learnings` |
 | `quiz` | `Quiz`/`QuizSubmission` entities + `/api/v1/quizzes/*` endpoints (`QuizController`, `QuizService`) — question list, attempt start/resume/autosave/submit, result, plus the QStash-driven `auto-submit` callback |
 | `common.response` | `ApiResponse<T>` envelope, `StatusName` |
