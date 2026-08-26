@@ -20,6 +20,7 @@ import com.ailene.lms.video.Video;
 import com.ailene.lms.video.VideoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -120,6 +121,45 @@ public class LearningsService {
         return new QuizDetailsResponse(quiz.getId(), quiz.getName(), quiz.getDescription(), quiz.getOrderIndex(),
                 new ChapterSummary(chapter.getId(), chapter.getName()), stats.getQuestionCount(),
                 stats.getXpReward(), stats.getAttempts(), questions);
+    }
+
+    @Transactional
+    public MaterialCompletionResponse completeMaterial(String jwt, MaterialCompletionRequest request) {
+        UUID userId = authService.resolveUserId(jwt);
+
+        Material material = materialRepository.findById(request.materialId())
+                .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
+        Chapter chapter = resolveChapter(material.getChapterId());
+        Access access = resolveAccess(userId, chapter);
+
+        materialRepository.insertCompletion(material.getId(), access.getId());
+        int inserted = materialRepository.insertXpEarning(material.getId(), access.getId(), material.getXpReward());
+        Short xpAwarded = inserted > 0 ? material.getXpReward() : 0;
+
+        var completion = materialRepository.findCompletion(material.getId(), access.getId());
+        Instant completedAt = completion == null ? null : completion.getCompletedAt();
+
+        return new MaterialCompletionResponse(material.getId(), true, TimeUtils.toOffsetDateTime(completedAt),
+                xpAwarded);
+    }
+
+    @Transactional
+    public VideoCompletionResponse completeVideo(String jwt, VideoCompletionRequest request) {
+        UUID userId = authService.resolveUserId(jwt);
+
+        Video video = videoRepository.findById(request.videoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Video not found"));
+        Chapter chapter = resolveChapter(video.getChapterId());
+        Access access = resolveAccess(userId, chapter);
+
+        videoRepository.insertCompletion(video.getId(), access.getId());
+        int inserted = videoRepository.insertXpEarning(video.getId(), access.getId(), video.getXpReward());
+        Short xpAwarded = inserted > 0 ? video.getXpReward() : 0;
+
+        var completion = videoRepository.findCompletion(video.getId(), access.getId());
+        Instant completedAt = completion == null ? null : completion.getCompletedAt();
+
+        return new VideoCompletionResponse(video.getId(), true, TimeUtils.toOffsetDateTime(completedAt), xpAwarded);
     }
 
     private Chapter resolveChapter(Integer chapterId) {

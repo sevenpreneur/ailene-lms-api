@@ -56,4 +56,22 @@ public class LearningsController {
         QuizDetailsResponse response = learningsService.getQuizDetails(jwt, request);
         return ApiResponse.success(HttpStatus.OK, "quiz retrieved successfully", response);
     }
+
+    @PostMapping("/material-completion")
+    public ResponseEntity<ApiResponse<MaterialCompletionResponse>> materialCompletion(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody MaterialCompletionRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        MaterialCompletionResponse response = learningsService.completeMaterial(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "material completed successfully", response);
+    }
+
+    @PostMapping("/video-completion")
+    public ResponseEntity<ApiResponse<VideoCompletionResponse>> videoCompletion(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody VideoCompletionRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        VideoCompletionResponse response = learningsService.completeVideo(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "video completed successfully", response);
+    }
 }

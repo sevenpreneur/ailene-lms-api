@@ -1,6 +1,7 @@
 package com.ailene.lms.video;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,4 +31,21 @@ public interface VideoRepository extends JpaRepository<Video, Integer> {
                       WHERE vc.student_access_id = :accessId AND vc.video_id = :videoId) AS completedAt
             """, nativeQuery = true)
     VideoCompletionProjection findCompletion(@Param("videoId") Integer videoId, @Param("accessId") String accessId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO lms_video_completions (student_access_id, video_id)
+            VALUES (:accessId, :videoId)
+            ON CONFLICT (student_access_id, video_id) DO NOTHING
+            """, nativeQuery = true)
+    int insertCompletion(@Param("videoId") Integer videoId, @Param("accessId") String accessId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO lms_xp_earnings (student_access_id, learning_type, learning_id, xp_earned)
+            VALUES (:accessId, 'video', CAST(:videoId AS text), :xpEarned)
+            ON CONFLICT (student_access_id, learning_type, learning_id) DO NOTHING
+            """, nativeQuery = true)
+    int insertXpEarning(@Param("videoId") Integer videoId, @Param("accessId") String accessId,
+            @Param("xpEarned") Short xpEarned);
 }

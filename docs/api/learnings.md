@@ -1,6 +1,6 @@
 # Learnings
 
-Endpoints for listing the quizzes, videos, and materials ("tasks") in one chapter, and for reading a single one's full detail — each annotated with the caller's own XP and completion status.
+Endpoints for listing the quizzes, videos, and materials ("tasks") in one chapter, for reading a single one's full detail, and for marking a material/video complete — each annotated with the caller's own XP and completion status.
 
 ## Endpoints
 
@@ -267,3 +267,95 @@ Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expir
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
+
+### `POST {base_url}/api/learnings/material-completion`
+
+Marks a material complete for the caller and awards its XP. Idempotent — calling it again for an already-completed material still returns `completed: true` with the original `completed_at`, but `xp_awarded` is `0` since the XP was already granted.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "material_id": "430bb86dc0edc244188fd9eb"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `material_id` | string | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "material completed successfully",
+  "data": {
+    "material_id": "430bb86dc0edc244188fd9eb",
+    "completed": true,
+    "completed_at": "2026-08-26T09:38:15.117Z",
+    "xp_awarded": 30
+  }
+}
+```
+
+`completed` is always `true` on success. `completed_at` is the timestamp of the *first* completion — replaying this call doesn't move it. `xp_awarded` is the material's `xp_reward` on first completion, `0` on every call after that (XP is granted once per `(access, material)`, backed by `lms_xp_earnings`'s unique constraint).
+
+**Errors**
+
+Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expired session), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
+
+### `POST {base_url}/api/learnings/video-completion`
+
+Marks a video complete for the caller and awards its XP. Same idempotency behavior as `material-completion` above.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "video_id": 5
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `video_id` | integer | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "video completed successfully",
+  "data": {
+    "video_id": 5,
+    "completed": true,
+    "completed_at": "2026-08-26T09:38:15.117Z",
+    "xp_awarded": 15
+  }
+}
+```
+
+`completed`/`completed_at`/`xp_awarded` follow the same rules as `material-completion` above.
+
+**Errors**
+
+Same shape and cases as `POST /api/learnings` above (missing/invalid auth, expired session), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |

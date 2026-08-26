@@ -1,6 +1,7 @@
 package com.ailene.lms.material;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,4 +30,21 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
             """, nativeQuery = true)
     MaterialCompletionProjection findCompletion(@Param("materialId") String materialId,
             @Param("accessId") String accessId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO lms_material_completions (student_access_id, material_id)
+            VALUES (:accessId, :materialId)
+            ON CONFLICT (student_access_id, material_id) DO NOTHING
+            """, nativeQuery = true)
+    int insertCompletion(@Param("materialId") String materialId, @Param("accessId") String accessId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO lms_xp_earnings (student_access_id, learning_type, learning_id, xp_earned)
+            VALUES (:accessId, 'material', :materialId, :xpEarned)
+            ON CONFLICT (student_access_id, learning_type, learning_id) DO NOTHING
+            """, nativeQuery = true)
+    int insertXpEarning(@Param("materialId") String materialId, @Param("accessId") String accessId,
+            @Param("xpEarned") Short xpEarned);
 }
