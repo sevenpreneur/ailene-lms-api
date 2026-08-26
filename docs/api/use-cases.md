@@ -4,7 +4,7 @@ Endpoint for browsing a project's use case library (curated use cases only — `
 
 ## Endpoints
 
-### `POST {base_url}/api/use-cases`
+### `POST {base_url}/api/v1/use-cases`
 
 Returns a paginated, searchable list of a project's active, non-self-created use cases.
 
@@ -75,9 +75,9 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
 
-### `POST {base_url}/api/use-cases/assigned`
+### `POST {base_url}/api/v1/use-cases/assigned`
 
-Returns the use cases a champion has assigned to the caller specifically (`lms_use_case_submissions.assigned_by_access_id IS NOT NULL`) — not the general library, and not self-initiated practice. Mirrors `POST /api/prompts/assigned` exactly.
+Returns the use cases a champion has assigned to the caller specifically (`lms_use_case_submissions.assigned_by_access_id IS NOT NULL`) — not the general library, and not self-initiated practice. Mirrors `POST /api/v1/prompts/assigned` exactly.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
 
@@ -136,7 +136,7 @@ Not paginated (this is always scoped to just the caller's own assignments). Sort
 
 **Errors**
 
-Same shape and cases as `POST /api/use-cases` above (missing/invalid auth, expired session, blank `project_id`), plus:
+Same shape and cases as `POST /api/v1/use-cases` above (missing/invalid auth, expired session, blank `project_id`), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|

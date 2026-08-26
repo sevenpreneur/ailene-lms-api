@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/prompts")
+@RequestMapping("/api/v1/prompts")
 @RequiredArgsConstructor
 public class PromptController {
 

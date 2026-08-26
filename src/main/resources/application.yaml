@@ -31,6 +31,13 @@ google:
 security:
   secret-key: ${SECRET_KEY}
 
+app:
+  base-url: ${APP_BASE_URL:}
+
+qstash:
+  url: ${QSTASH_URL:}
+  token: ${QSTASH_TOKEN:}
+
 management:
   endpoints:
     web:

@@ -1,4 +1,4 @@
-package com.ailene.lms.learnings;
+package com.ailene.lms.video;
 
 import com.ailene.lms.common.response.ApiResponse;
 import com.ailene.lms.common.security.SecretKeyGuard;
@@ -14,28 +14,28 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/learnings")
+@RequestMapping("/api/v1/videos")
 @RequiredArgsConstructor
-public class LearningsController {
+public class VideoController {
 
-    private final LearningsService learningsService;
+    private final VideoService videoService;
     private final SecretKeyGuard secretKeyGuard;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<LearningsResponse>> tasks(
+    @PostMapping("/details")
+    public ResponseEntity<ApiResponse<VideoDetailsResponse>> details(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody LearningsRequest request) {
+            @Valid @RequestBody VideoDetailsRequest request) {
         String jwt = secretKeyGuard.extractBearerToken(authorization);
-        LearningsResponse response = learningsService.getTasks(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "learnings retrieved successfully", response);
+        VideoDetailsResponse response = videoService.getVideoDetails(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "video retrieved successfully", response);
     }
 
-    @PostMapping("/materials")
-    public ResponseEntity<ApiResponse<LevelMaterialsResponse>> levelMaterials(
+    @PostMapping("/completion")
+    public ResponseEntity<ApiResponse<VideoCompletionResponse>> completion(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @Valid @RequestBody LevelMaterialsRequest request) {
+            @Valid @RequestBody VideoCompletionRequest request) {
         String jwt = secretKeyGuard.extractBearerToken(authorization);
-        LevelMaterialsResponse response = learningsService.getLevelMaterials(jwt, request);
-        return ApiResponse.success(HttpStatus.OK, "level materials retrieved successfully", response);
+        VideoCompletionResponse response = videoService.completeVideo(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "video completed successfully", response);
     }
 }

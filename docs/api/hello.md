@@ -4,7 +4,7 @@ A single smoke-test endpoint with no business purpose — for confirming the dep
 
 ## Endpoints
 
-### `POST {base_url}/api/hello-world`
+### `POST {base_url}/api/v1/hello-world`
 
 Returns a static greeting if the caller's bearer token matches `SECRET_KEY`.
 

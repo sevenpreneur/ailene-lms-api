@@ -4,7 +4,7 @@ Endpoint for browsing a project's prompt library (curated prompts only — `is_s
 
 ## Endpoints
 
-### `POST {base_url}/api/prompts`
+### `POST {base_url}/api/v1/prompts`
 
 Returns a paginated, searchable list of a project's active, non-self-created prompts.
 
@@ -75,7 +75,7 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
 
-### `POST {base_url}/api/prompts/assigned`
+### `POST {base_url}/api/v1/prompts/assigned`
 
 Returns the prompts a champion has assigned to the caller specifically (`lms_prompt_submissions.assigned_by_access_id IS NOT NULL`) — not the general library, and not self-initiated practice.
 
@@ -136,7 +136,7 @@ Not paginated (this is always scoped to just the caller's own assignments). Sort
 
 **Errors**
 
-Same shape and cases as `POST /api/prompts` above (missing/invalid auth, expired session, blank `project_id`), plus:
+Same shape and cases as `POST /api/v1/prompts` above (missing/invalid auth, expired session, blank `project_id`), plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|

@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/use-cases")
+@RequestMapping("/api/v1/use-cases")
 @RequiredArgsConstructor
 public class UseCaseController {
 

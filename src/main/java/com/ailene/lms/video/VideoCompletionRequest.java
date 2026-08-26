@@ -1,4 +1,4 @@
-package com.ailene.lms.learnings;
+package com.ailene.lms.video;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

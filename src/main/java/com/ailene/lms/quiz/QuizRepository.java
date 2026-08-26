@@ -1,6 +1,7 @@
 package com.ailene.lms.quiz;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -49,4 +50,47 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             ORDER BY qq.order_index ASC, qo.option_code ASC
             """, nativeQuery = true)
     List<QuizQuestionOptionProjection> findQuestionsWithOptions(@Param("quizId") String quizId);
+
+    @Query(value = """
+            SELECT xe.xp_earned FROM lms_xp_earnings xe
+            WHERE xe.student_access_id = :accessId AND xe.learning_type = 'quiz' AND xe.learning_id = :quizId
+            """, nativeQuery = true)
+    Short findXpEarned(@Param("quizId") String quizId, @Param("accessId") String accessId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO lms_xp_earnings (student_access_id, learning_type, learning_id, xp_earned)
+            VALUES (:accessId, 'quiz', :quizId, :xpEarned)
+            ON CONFLICT (student_access_id, learning_type, learning_id)
+            DO UPDATE SET xp_earned = EXCLUDED.xp_earned, earned_at = CURRENT_TIMESTAMP
+            """, nativeQuery = true)
+    void upsertXpEarning(@Param("quizId") String quizId, @Param("accessId") String accessId,
+            @Param("xpEarned") Short xpEarned);
+
+    @Query(value = """
+            SELECT qq.id AS questionId,
+                   qq.xp_reward AS xpReward,
+                   (SELECT qo.option_code FROM lms_quiz_options qo
+                      WHERE qo.question_id = qq.id AND qo.is_correct = true LIMIT 1) AS correctOptionCode
+            FROM lms_quiz_questions qq
+            WHERE qq.quiz_id = :quizId
+            """, nativeQuery = true)
+    List<QuizAnswerKeyProjection> findAnswerKey(@Param("quizId") String quizId);
+
+    @Query(value = """
+            SELECT qq.id AS questionId,
+                   qq.question AS question,
+                   qq.order_index AS questionOrderIndex,
+                   qq.xp_reward AS questionXpReward,
+                   qq.explanation AS explanation,
+                   qo.id AS optionId,
+                   qo.option_code AS optionCode,
+                   qo.text AS optionText,
+                   qo.is_correct AS optionIsCorrect
+            FROM lms_quiz_questions qq
+            JOIN lms_quiz_options qo ON qo.question_id = qq.id
+            WHERE qq.quiz_id = :quizId
+            ORDER BY qq.order_index ASC, qo.option_code ASC
+            """, nativeQuery = true)
+    List<QuizResultQuestionOptionProjection> findQuestionsWithAnswerKey(@Param("quizId") String quizId);
 }

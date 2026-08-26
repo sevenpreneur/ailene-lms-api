@@ -1,4 +1,4 @@
-package com.ailene.lms.learnings;
+package com.ailene.lms.video;
 
 import com.ailene.lms.common.ChapterSummary;
 

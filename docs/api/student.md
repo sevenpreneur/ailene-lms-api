@@ -4,7 +4,7 @@ Endpoints for a logged-in learner to check their own progress within a specific 
 
 ## Endpoints
 
-### `POST {base_url}/api/student/status`
+### `POST {base_url}/api/v1/student/status`
 
 Returns the caller's XP, current level, and pre-assessment status for one project.
 
@@ -63,7 +63,7 @@ Example error response (`404 Not Found`):
 }
 ```
 
-### `POST {base_url}/api/student/chapters`
+### `POST {base_url}/api/v1/student/chapters`
 
 Returns a project's active chapters, ordered by `session_date` ascending, each annotated with the caller's own completion progress.
 
@@ -118,7 +118,7 @@ Returns a project's active chapters, ordered by `session_date` ascending, each a
 
 Same shape and cases as `student/status` above (missing/invalid auth, expired session, blank `project_id`, or no access for the project).
 
-### `POST {base_url}/api/student/levels`
+### `POST {base_url}/api/v1/student/levels`
 
 Returns a project's active `lms_levels` rows, ordered by `level_number` ascending.
 

@@ -4,7 +4,7 @@ Google-only login: the client signs the user in with Google and hands us the res
 
 ## Endpoints
 
-### `POST {base_url}/api/auth/login/google`
+### `POST {base_url}/api/v1/auth/login/google`
 
 Verifies a Google access token and logs the matching LMS user in.
 
@@ -70,7 +70,7 @@ Example error response (`403 Forbidden`):
 }
 ```
 
-### `POST {base_url}/api/auth/check-session`
+### `POST {base_url}/api/v1/auth/check-session`
 
 Validates a session JWT and returns the caller's current profile — for restoring a session on page reload (e.g. showing name/avatar in a sidebar) without logging in again.
 
@@ -133,7 +133,7 @@ Example error response (`401 Unauthorized`):
 }
 ```
 
-### `POST {base_url}/api/auth/logout`
+### `POST {base_url}/api/v1/auth/logout`
 
 Deletes the caller's session row, so that exact JWT can never pass `check-session` again — not just discarded client-side.
 

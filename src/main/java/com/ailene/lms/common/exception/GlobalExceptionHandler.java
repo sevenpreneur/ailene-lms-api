@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
+        return ApiResponse.error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
         return ApiResponse.error(HttpStatus.UNAUTHORIZED, ex.getMessage());

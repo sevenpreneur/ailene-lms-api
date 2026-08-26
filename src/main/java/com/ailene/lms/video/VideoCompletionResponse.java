@@ -1,4 +1,4 @@
-package com.ailene.lms.learnings;
+package com.ailene.lms.video;
 
 import java.time.OffsetDateTime;
 
