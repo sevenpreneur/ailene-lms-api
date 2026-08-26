@@ -21,6 +21,7 @@ import com.ailene.lms.video.VideoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,12 +69,12 @@ public class LearningsService {
         Access access = resolveAccess(userId, chapter);
 
         var completion = materialRepository.findCompletion(material.getId(), access.getId());
-        boolean completed = completion.getCompletedAt() != null;
+        Instant completedAt = completion == null ? null : completion.getCompletedAt();
 
         return new MaterialDetailsResponse(material.getId(), material.getTitle(), material.getDescription(),
                 material.getContent(), material.getFileUrl(), material.getImageUrl(), material.getXpReward(),
-                material.getOrderIndex(), new ChapterSummary(chapter.getId(), chapter.getName()), completed,
-                TimeUtils.toOffsetDateTime(completion.getCompletedAt()), material.getCreatedAt(),
+                material.getOrderIndex(), new ChapterSummary(chapter.getId(), chapter.getName()),
+                completedAt != null, TimeUtils.toOffsetDateTime(completedAt), material.getCreatedAt(),
                 material.getUpdatedAt());
     }
 
@@ -86,11 +87,11 @@ public class LearningsService {
         Access access = resolveAccess(userId, chapter);
 
         var completion = videoRepository.findCompletion(video.getId(), access.getId());
-        boolean completed = completion.getCompletedAt() != null;
+        Instant completedAt = completion == null ? null : completion.getCompletedAt();
 
         return new VideoDetailsResponse(video.getId(), video.getTitle(), video.getDescription(), video.getVideoUrl(),
                 video.getXpReward(), video.getOrderIndex(), new ChapterSummary(chapter.getId(), chapter.getName()),
-                completed, TimeUtils.toOffsetDateTime(completion.getCompletedAt()), video.getCreatedAt(),
+                completedAt != null, TimeUtils.toOffsetDateTime(completedAt), video.getCreatedAt(),
                 video.getUpdatedAt());
     }
 
