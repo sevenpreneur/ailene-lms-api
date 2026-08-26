@@ -1,5 +1,7 @@
 package com.ailene.lms.quiz;
 
+import java.time.Instant;
+
 public interface QuizTaskProjection {
     String getId();
 
@@ -18,4 +20,6 @@ public interface QuizTaskProjection {
     Integer getBestScore();
 
     Long getAttempts();
+
+    Instant getActiveAttemptStartedAt();
 }

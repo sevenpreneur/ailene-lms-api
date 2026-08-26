@@ -41,7 +41,8 @@ Returns a chapter's active quizzes, videos, and materials, each ordered by `orde
         "xp_reward": 60,
         "xp_earned": 0,
         "best_score": null,
-        "attempts": 0
+        "attempts": 0,
+        "active_attempt_started_at": null
       }
     ],
     "videos": [
@@ -70,7 +71,7 @@ Returns a chapter's active quizzes, videos, and materials, each ordered by `orde
 }
 ```
 
-`xp_reward` on a quiz is the sum of its questions' `xp_reward`; on a video/material it's that row's own column. `xp_earned` (quizzes and videos only — omitted for materials) comes from `lms_xp_earnings` for the caller's access (`0` if not earned yet). For quizzes, `best_score`/`attempts` are derived from the caller's completed `lms_quiz_submissions` (`best_score` is `null` with zero attempts). For videos/materials, `completed` reflects `lms_video_completions`/`lms_material_completions`. Materials omit `content`/`file_url`/`image_url` here — this is a list view, not the material's full body (see `docs/api/materials.md`). `project_id` isn't part of the request — it's resolved internally from `chapter_id` via the chapter's level.
+`xp_reward` on a quiz is the sum of its questions' `xp_reward`; on a video/material it's that row's own column. `xp_earned` (quizzes and videos only — omitted for materials) comes from `lms_xp_earnings` for the caller's access (`0` if not earned yet). For quizzes, `best_score`/`attempts` are derived from the caller's completed `lms_quiz_submissions` (`best_score` is `null` with zero attempts). `active_attempt_started_at` is that quiz's non-finalized `lms_quiz_submissions.started_at` for the caller (`null` if there's no draft in progress — the client shows "Mulai Quiz"; a timestamp means one's in progress — the client shows "Lanjutkan Quiz" and derives the remaining time itself from `started_at` plus the quiz's 20-minute limit, same limit `POST /api/v1/quizzes/attempt` uses, see `docs/api/quizzes.md`). For videos/materials, `completed` reflects `lms_video_completions`/`lms_material_completions`. Materials omit `content`/`file_url`/`image_url` here — this is a list view, not the material's full body (see `docs/api/materials.md`). `project_id` isn't part of the request — it's resolved internally from `chapter_id` via the chapter's level.
 
 **Errors**
 

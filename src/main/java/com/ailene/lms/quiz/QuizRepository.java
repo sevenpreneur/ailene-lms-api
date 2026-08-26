@@ -21,7 +21,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                    (SELECT MAX(qs.score) FROM lms_quiz_submissions qs
                       WHERE qs.student_access_id = :accessId AND qs.quiz_id = q.id AND qs.is_completed = true) AS bestScore,
                    (SELECT COUNT(*) FROM lms_quiz_submissions qs
-                      WHERE qs.student_access_id = :accessId AND qs.quiz_id = q.id AND qs.is_completed = true) AS attempts
+                      WHERE qs.student_access_id = :accessId AND qs.quiz_id = q.id AND qs.is_completed = true) AS attempts,
+                   (SELECT MAX(qs.started_at) FROM lms_quiz_submissions qs
+                      WHERE qs.student_access_id = :accessId AND qs.quiz_id = q.id AND qs.is_completed = false) AS activeAttemptStartedAt
             FROM lms_quizzes q
             WHERE q.chapter_id = :chapterId AND q.status = 'active'
             ORDER BY q.order_index ASC
