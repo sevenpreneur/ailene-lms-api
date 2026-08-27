@@ -208,3 +208,58 @@ Example error response (`404 Not Found`):
   "message": "Chapter not found"
 }
 ```
+
+### `POST {base_url}/api/v1/learnings/today-focus`
+
+Returns the single next thing the caller should do in the project — the "today focus" widget on the student dashboard.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "project_id": "V7rdgcYkq9PHQZkwvoA-F"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `project_id` | string | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "today focus retrieved successfully",
+  "data": {
+    "focus": {
+      "kind": "material",
+      "task_id": "430bb86dc0edc244188fd9eb",
+      "task_title": "Materi 1.1 — Orientasi & tetapkan target",
+      "chapter_id": 5,
+      "chapter_name": "Paham AI & pakai dengan benar",
+      "level_id": 1,
+      "level_number": 1,
+      "category": null,
+      "assigned_by": null,
+      "deadline": null
+    }
+  }
+}
+```
+
+`data.focus` is `null` when there's nothing left to do (every unlocked, started chapter's tasks are complete and no assignment is pending). Otherwise `kind` is one of `material` / `quiz` / `video` / `prompt_practice` / `use_case_practice`, and `task_id` is always a string regardless of the underlying table's id type.
+
+Selection walks the project's active chapters in `session_date` order, skipping any chapter whose level is above the caller's current level or whose `session_date` hasn't started yet. For the first eligible chapter, it picks — in this priority — the chapter's first incomplete material, else its first incomplete quiz, else the caller's nearest-deadline pending assignment (an `lms_prompt_submissions`/`lms_use_case_submissions` row with an assigner and a deadline but no submission yet, across the whole project, not just this chapter), else the chapter's first incomplete video, then stops. If no chapter yields anything, the nearest-deadline pending assignment (if any) is returned instead. `chapter_id`/`chapter_name`/`level_id`/`level_number` are `null` for `prompt_practice`/`use_case_practice` foci (those aren't chapter-scoped); `category` is that prompt/use case's first assigned category (`null` if it has none), and `assigned_by` is `null` for `material`/`quiz`/`video`.
+
+**Errors**
+
+Same shape and cases as `levels` above (missing/invalid auth, expired session, blank `project_id`), plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for this `project_id` |

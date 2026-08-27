@@ -46,6 +46,22 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
     List<LevelMaterialProjection> findLevelMaterials(@Param("levelId") Integer levelId,
             @Param("accessId") String accessId);
 
+    @Query(value = """
+            SELECT c.id AS chapterId,
+                   m.id AS materialId,
+                   m.title AS title,
+                   m.order_index AS orderIndex,
+                   EXISTS (SELECT 1 FROM lms_material_completions mc
+                      WHERE mc.student_access_id = :accessId AND mc.material_id = m.id) AS completed
+            FROM lms_materials m
+            JOIN lms_chapters c ON c.id = m.chapter_id AND c.status = 'active'
+            JOIN lms_levels lv ON lv.id = c.level_id
+            WHERE lv.project_id = :projectId AND m.status = 'active'
+            ORDER BY c.session_date ASC, m.order_index ASC
+            """, nativeQuery = true)
+    List<MaterialFocusProjection> findProjectMaterialsForFocus(@Param("projectId") String projectId,
+            @Param("accessId") String accessId);
+
     @Modifying
     @Query(value = """
             INSERT INTO lms_material_completions (student_access_id, material_id)

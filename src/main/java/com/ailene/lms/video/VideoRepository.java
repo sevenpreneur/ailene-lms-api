@@ -32,6 +32,22 @@ public interface VideoRepository extends JpaRepository<Video, Integer> {
             """, nativeQuery = true)
     VideoCompletionProjection findCompletion(@Param("videoId") Integer videoId, @Param("accessId") String accessId);
 
+    @Query(value = """
+            SELECT c.id AS chapterId,
+                   v.id AS videoId,
+                   v.title AS title,
+                   v.order_index AS orderIndex,
+                   EXISTS (SELECT 1 FROM lms_video_completions vc
+                      WHERE vc.student_access_id = :accessId AND vc.video_id = v.id) AS completed
+            FROM lms_videos v
+            JOIN lms_chapters c ON c.id = v.chapter_id AND c.status = 'active'
+            JOIN lms_levels lv ON lv.id = c.level_id
+            WHERE lv.project_id = :projectId AND v.status = 'active'
+            ORDER BY c.session_date ASC, v.order_index ASC
+            """, nativeQuery = true)
+    List<VideoFocusProjection> findProjectVideosForFocus(@Param("projectId") String projectId,
+            @Param("accessId") String accessId);
+
     @Modifying
     @Query(value = """
             INSERT INTO lms_video_completions (student_access_id, video_id)

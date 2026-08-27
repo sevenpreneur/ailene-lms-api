@@ -49,4 +49,13 @@ public class LearningsController {
         LearningsResponse response = learningsService.getTasks(jwt, request);
         return ApiResponse.success(HttpStatus.OK, "learnings retrieved successfully", response);
     }
+
+    @PostMapping("/today-focus")
+    public ResponseEntity<ApiResponse<TodayFocusResponse>> todayFocus(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody TodayFocusRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        TodayFocusResponse response = learningsService.getTodayFocus(jwt, request);
+        return ApiResponse.success(HttpStatus.OK, "today focus retrieved successfully", response);
+    }
 }

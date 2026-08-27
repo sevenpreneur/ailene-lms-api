@@ -59,6 +59,22 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             """, nativeQuery = true)
     Short findXpEarned(@Param("quizId") String quizId, @Param("accessId") String accessId);
 
+    @Query(value = """
+            SELECT c.id AS chapterId,
+                   q.id AS quizId,
+                   q.name AS name,
+                   q.order_index AS orderIndex,
+                   EXISTS (SELECT 1 FROM lms_quiz_submissions qs
+                      WHERE qs.student_access_id = :accessId AND qs.quiz_id = q.id AND qs.is_completed = true) AS completed
+            FROM lms_quizzes q
+            JOIN lms_chapters c ON c.id = q.chapter_id AND c.status = 'active'
+            JOIN lms_levels lv ON lv.id = c.level_id
+            WHERE lv.project_id = :projectId AND q.status = 'active'
+            ORDER BY c.session_date ASC, q.order_index ASC
+            """, nativeQuery = true)
+    List<QuizFocusProjection> findProjectQuizzesForFocus(@Param("projectId") String projectId,
+            @Param("accessId") String accessId);
+
     @Modifying
     @Query(value = """
             INSERT INTO lms_xp_earnings (student_access_id, learning_type, learning_id, xp_earned)
