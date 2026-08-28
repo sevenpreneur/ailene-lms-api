@@ -1,6 +1,7 @@
 package com.ailene.lms.usecase;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -113,4 +114,12 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             """, nativeQuery = true)
     List<UseCaseCompetencyProjection> findCompetencySubmissions(@Param("projectId") String projectId,
             @Param("accessId") String accessId);
+
+    @Query(value = "SELECT COUNT(*) FROM lms_categories WHERE id IN (:categoryIds)", nativeQuery = true)
+    long countExistingCategories(@Param("categoryIds") List<Short> categoryIds);
+
+    @Modifying
+    @Query(value = "INSERT INTO lms_use_case_categories (use_case_id, category_id) VALUES (:useCaseId, :categoryId)",
+            nativeQuery = true)
+    void insertCategory(@Param("useCaseId") Integer useCaseId, @Param("categoryId") Short categoryId);
 }

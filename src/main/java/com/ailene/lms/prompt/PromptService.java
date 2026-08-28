@@ -2,9 +2,12 @@ package com.ailene.lms.prompt;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
+import com.ailene.lms.access.GroupSummaryProjection;
 import com.ailene.lms.common.AssignedByUser;
 import com.ailene.lms.common.CategorySummary;
+import com.ailene.lms.common.Status;
 import com.ailene.lms.common.TimeUtils;
+import com.ailene.lms.common.exception.BadRequestException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.common.pagination.PageMeta;
 import com.ailene.lms.common.pagination.PagedResponse;
@@ -13,7 +16,9 @@ import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +29,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PromptService {
 
+    private static final short SELF_CREATE_LEVEL_NUMBER = 2;
+    private static final String SELF_PRACTICE_PLACEHOLDER = "(Latihan mandiri — tanpa target output)";
+
     private final PromptRepository promptRepository;
+    private final PromptSubmissionRepository promptSubmissionRepository;
     private final AccessRepository accessRepository;
     private final LevelRepository levelRepository;
 
@@ -118,6 +127,86 @@ public class PromptService {
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
                 submission == null ? null : submission.getIsAccepted());
+    }
+
+    @Transactional
+    public PromptDetailsResponse selfCreate(UUID userId, PromptSelfCreateRequest request) {
+        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, request.projectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+        if (summary.getGroupId() == null) {
+            throw new BadRequestException(
+                    "You're not part of a group yet, so self-created practice isn't available.");
+        }
+        String championAccessId = accessRepository
+                .findChampionAccessId(request.projectId(), summary.getGroupId())
+                .orElseThrow(() -> new ResourceNotFoundException("No champion found for this group"));
+
+        List<Short> categoryIds = request.categoryIds().stream().distinct().toList();
+        if (promptRepository.countExistingCategories(categoryIds) != categoryIds.size()) {
+            throw new ResourceNotFoundException("Some categories were not found");
+        }
+
+        Level level = levelRepository.findByLevelNumber(SELF_CREATE_LEVEL_NUMBER)
+                .orElseThrow(() -> new ResourceNotFoundException("Prompt level (L2) not found"));
+
+        Prompt prompt = new Prompt();
+        prompt.setLevelId(level.getId());
+        prompt.setName(request.name());
+        prompt.setScenario(request.scenario());
+        prompt.setExpectedOutput(SELF_PRACTICE_PLACEHOLDER);
+        prompt.setStatus(Status.active);
+        prompt.setIsSelfCreated(true);
+        Integer promptId = promptRepository.save(prompt).getId();
+
+        for (Short categoryId : categoryIds) {
+            promptRepository.insertCategory(promptId, categoryId);
+        }
+
+        PromptSubmission submission = new PromptSubmission();
+        submission.setStudentAccessId(summary.getAccessId());
+        submission.setPromptId(promptId);
+        submission.setAssignedByAccessId(championAccessId);
+        submission.setInput(request.input());
+        submission.setOutput(request.output());
+        submission.setSubmittedAt(OffsetDateTime.now());
+        promptSubmissionRepository.save(submission);
+
+        return getDetails(userId, new PromptDetailsRequest(promptId));
+    }
+
+    @Transactional
+    public PromptDetailsResponse selfAssign(UUID userId, PromptSelfAssignRequest request) {
+        Prompt prompt = promptRepository.findById(request.promptId())
+                .filter(p -> p.getStatus() == Status.active)
+                .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
+        Level level = levelRepository.findById(prompt.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+
+        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, level.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+        if (summary.getGroupId() == null) {
+            throw new BadRequestException(
+                    "You're not part of a group yet, so self-assigned practice isn't available.");
+        }
+
+        PromptSubmission submission = promptSubmissionRepository
+                .findByStudentAccessIdAndPromptId(summary.getAccessId(), prompt.getId())
+                .orElseGet(() -> {
+                    PromptSubmission created = new PromptSubmission();
+                    created.setStudentAccessId(summary.getAccessId());
+                    created.setPromptId(prompt.getId());
+                    return created;
+                });
+
+        if (submission.getAssignedByAccessId() == null) {
+            String championAccessId = accessRepository
+                    .findChampionAccessId(level.getProjectId(), summary.getGroupId())
+                    .orElseThrow(() -> new ResourceNotFoundException("No champion found for this group"));
+            submission.setAssignedByAccessId(championAccessId);
+            promptSubmissionRepository.save(submission);
+        }
+
+        return getDetails(userId, new PromptDetailsRequest(prompt.getId()));
     }
 
     private PromptAssignedItem toAssignedItem(PromptAssignedProjection prompt, List<CategorySummary> categories) {

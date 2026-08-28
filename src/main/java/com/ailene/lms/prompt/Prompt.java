@@ -38,7 +38,7 @@ public class Prompt {
     @Column(name = "expected_output", nullable = false)
     private String expectedOutput;
 
-    @Column(name = "xp_reward", nullable = false)
+    @Column(name = "xp_reward", nullable = false, insertable = false)
     private Short xpReward;
 
     @Enumerated(EnumType.STRING)
@@ -52,6 +52,6 @@ public class Prompt {
     @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime updatedAt;
 }

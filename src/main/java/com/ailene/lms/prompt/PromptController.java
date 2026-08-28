@@ -56,4 +56,24 @@ public class PromptController {
         PromptDetailsResponse response = promptService.getDetails(userId, request);
         return ApiResponse.success(HttpStatus.OK, "prompt retrieved successfully", response);
     }
+
+    @PostMapping("/self-create")
+    public ResponseEntity<ApiResponse<PromptDetailsResponse>> selfCreate(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PromptSelfCreateRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        PromptDetailsResponse response = promptService.selfCreate(userId, request);
+        return ApiResponse.success(HttpStatus.CREATED, "self-created prompt submitted successfully", response);
+    }
+
+    @PostMapping("/self-assign")
+    public ResponseEntity<ApiResponse<PromptDetailsResponse>> selfAssign(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PromptSelfAssignRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        PromptDetailsResponse response = promptService.selfAssign(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "prompt self-assigned successfully", response);
+    }
 }

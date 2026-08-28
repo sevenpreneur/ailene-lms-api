@@ -119,4 +119,13 @@ public interface AccessRepository extends JpaRepository<Access, String> {
             """, nativeQuery = true)
     List<LeaderboardRowProjection> findGroupLeaderboard(@Param("projectId") String projectId,
             @Param("groupId") Integer groupId);
+
+    @Query(value = """
+            SELECT a.id
+            FROM lms_accesses a
+            WHERE a.project_id = :projectId AND a.group_id = :groupId AND a.role = 'champion'
+            ORDER BY a.created_at ASC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<String> findChampionAccessId(@Param("projectId") String projectId, @Param("groupId") Integer groupId);
 }

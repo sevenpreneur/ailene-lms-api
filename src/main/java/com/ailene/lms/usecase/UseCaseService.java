@@ -2,9 +2,12 @@ package com.ailene.lms.usecase;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
+import com.ailene.lms.access.GroupSummaryProjection;
 import com.ailene.lms.common.AssignedByUser;
 import com.ailene.lms.common.CategorySummary;
+import com.ailene.lms.common.Status;
 import com.ailene.lms.common.TimeUtils;
+import com.ailene.lms.common.exception.BadRequestException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.common.pagination.PageMeta;
 import com.ailene.lms.common.pagination.PagedResponse;
@@ -13,7 +16,9 @@ import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +29,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UseCaseService {
 
+    private static final short SELF_CREATE_LEVEL_NUMBER = 3;
+
     private final UseCaseRepository useCaseRepository;
+    private final UseCaseSubmissionRepository useCaseSubmissionRepository;
     private final AccessRepository accessRepository;
     private final LevelRepository levelRepository;
 
@@ -118,6 +126,90 @@ public class UseCaseService {
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
                 submission == null ? null : submission.getIsAccepted());
+    }
+
+    @Transactional
+    public UseCaseDetailsResponse selfCreate(UUID userId, UseCaseSelfCreateRequest request) {
+        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, request.projectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+        if (summary.getGroupId() == null) {
+            throw new BadRequestException(
+                    "You're not part of a group yet, so self-created practice isn't available.");
+        }
+        String championAccessId = accessRepository
+                .findChampionAccessId(request.projectId(), summary.getGroupId())
+                .orElseThrow(() -> new ResourceNotFoundException("No champion found for this group"));
+
+        List<Short> categoryIds = request.categoryIds().stream().distinct().toList();
+        if (useCaseRepository.countExistingCategories(categoryIds) != categoryIds.size()) {
+            throw new ResourceNotFoundException("Some categories were not found");
+        }
+
+        Level level = levelRepository.findByLevelNumber(SELF_CREATE_LEVEL_NUMBER)
+                .orElseThrow(() -> new ResourceNotFoundException("Use case level (L3) not found"));
+
+        UseCase useCase = new UseCase();
+        useCase.setLevelId(level.getId());
+        useCase.setName(request.name());
+        useCase.setDescription(request.description());
+        useCase.setStatus(Status.active);
+        useCase.setIsSelfCreated(true);
+        Integer useCaseId = useCaseRepository.save(useCase).getId();
+
+        for (Short categoryId : categoryIds) {
+            useCaseRepository.insertCategory(useCaseId, categoryId);
+        }
+
+        UseCaseSubmission submission = new UseCaseSubmission();
+        submission.setStudentAccessId(summary.getAccessId());
+        submission.setUseCaseId(useCaseId);
+        submission.setAssignedByAccessId(championAccessId);
+        submission.setOutcomeProof(request.outcomeProof());
+        submission.setHoursWithAi(request.hoursWithAi());
+        submission.setHoursWithoutAi(request.hoursWithoutAi());
+        submission.setDescription(request.description());
+        submission.setAiTool(request.aiTool());
+        submission.setFrequency(request.frequency());
+        submission.setType(request.type());
+        submission.setSubmittedAt(OffsetDateTime.now());
+        useCaseSubmissionRepository.save(submission);
+
+        return getDetails(userId, new UseCaseDetailsRequest(useCaseId));
+    }
+
+    @Transactional
+    public UseCaseDetailsResponse selfAssign(UUID userId, UseCaseSelfAssignRequest request) {
+        UseCase useCase = useCaseRepository.findById(request.useCaseId())
+                .filter(u -> u.getStatus() == Status.active)
+                .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
+        Level level = levelRepository.findById(useCase.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+
+        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, level.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+        if (summary.getGroupId() == null) {
+            throw new BadRequestException(
+                    "You're not part of a group yet, so self-assigned practice isn't available.");
+        }
+
+        UseCaseSubmission submission = useCaseSubmissionRepository
+                .findByStudentAccessIdAndUseCaseId(summary.getAccessId(), useCase.getId())
+                .orElseGet(() -> {
+                    UseCaseSubmission created = new UseCaseSubmission();
+                    created.setStudentAccessId(summary.getAccessId());
+                    created.setUseCaseId(useCase.getId());
+                    return created;
+                });
+
+        if (submission.getAssignedByAccessId() == null) {
+            String championAccessId = accessRepository
+                    .findChampionAccessId(level.getProjectId(), summary.getGroupId())
+                    .orElseThrow(() -> new ResourceNotFoundException("No champion found for this group"));
+            submission.setAssignedByAccessId(championAccessId);
+            useCaseSubmissionRepository.save(submission);
+        }
+
+        return getDetails(userId, new UseCaseDetailsRequest(useCase.getId()));
     }
 
     private UseCaseAssignedItem toAssignedItem(UseCaseAssignedProjection useCase, List<CategorySummary> categories) {

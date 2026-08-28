@@ -1,6 +1,7 @@
 package com.ailene.lms.prompt;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -112,4 +113,12 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             """, nativeQuery = true)
     List<PromptCompetencyProjection> findCompetencySubmissions(@Param("projectId") String projectId,
             @Param("accessId") String accessId);
+
+    @Query(value = "SELECT COUNT(*) FROM lms_categories WHERE id IN (:categoryIds)", nativeQuery = true)
+    long countExistingCategories(@Param("categoryIds") List<Short> categoryIds);
+
+    @Modifying
+    @Query(value = "INSERT INTO lms_prompt_categories (prompt_id, category_id) VALUES (:promptId, :categoryId)",
+            nativeQuery = true)
+    void insertCategory(@Param("promptId") Integer promptId, @Param("categoryId") Short categoryId);
 }
