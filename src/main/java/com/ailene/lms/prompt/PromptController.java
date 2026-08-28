@@ -46,4 +46,14 @@ public class PromptController {
         List<PromptAssignedItem> response = promptService.listAssigned(userId, request);
         return ApiResponse.success(HttpStatus.OK, "assigned prompts retrieved successfully", response);
     }
+
+    @PostMapping("/details")
+    public ResponseEntity<ApiResponse<PromptDetailsResponse>> details(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PromptDetailsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        PromptDetailsResponse response = promptService.getDetails(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "prompt retrieved successfully", response);
+    }
 }

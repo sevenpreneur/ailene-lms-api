@@ -141,3 +141,63 @@ Same shape and cases as `POST /api/v1/use-cases` above (missing/invalid auth, ex
 | Code | Status | Message | When |
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for this `project_id` |
+
+### `POST {base_url}/api/v1/use-cases/details`
+
+Returns one use case's full detail by id — mirrors `POST /api/v1/prompts/details` exactly, just backed by `lms_use_cases`/`lms_use_case_submissions`. Unlike the list/assigned endpoints above, this doesn't filter by `status`/`is_self_created`, so it also works for a self-created or inactive use case as long as the id exists and the caller has access to its project.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "id": 2
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | integer | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "use case retrieved successfully",
+  "data": {
+    "id": 2,
+    "name": "Generate Job Description Multi-Platform",
+    "description": "HR perlu menulis ulang job description untuk berbagai kanal...",
+    "level_id": 3,
+    "level_number": 2,
+    "categories": [
+      { "id": 87, "name": "Human Capital" }
+    ],
+    "xp_reward": 70,
+    "is_self_created": false,
+    "deadline_at": "2026-08-29T17:28:16.541534Z",
+    "submitted_at": "2026-08-24T17:28:16.541534Z",
+    "reviewed_at": null,
+    "is_accepted": false
+  }
+}
+```
+
+`description` is `lms_use_cases.description` directly. `level_id`/`level_number` are resolved from `lms_use_cases.level_id` — `project_id` isn't part of the request, it's derived from there to check the caller's access. `deadline_at`/`submitted_at`/`reviewed_at`/`is_accepted` reflect the caller's own submission for this use case (from their `lms_accesses` row in the use case's project), same semantics as the list endpoint above — all `null` if they have no submission yet.
+
+**Errors**
+
+All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
+| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
+| 400 | `BAD_REQUEST` | `id: must not be null` | missing `id` field |
+| 404 | `NOT_FOUND` | `Use case not found` | no `lms_use_cases` row matches `id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the use case's project |

@@ -9,6 +9,8 @@ import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.common.pagination.PageMeta;
 import com.ailene.lms.common.pagination.PagedResponse;
 import com.ailene.lms.common.pagination.Pagination;
+import com.ailene.lms.level.Level;
+import com.ailene.lms.level.LevelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +26,7 @@ public class PromptService {
 
     private final PromptRepository promptRepository;
     private final AccessRepository accessRepository;
+    private final LevelRepository levelRepository;
 
     public PagedResponse<PromptListItem> list(UUID userId, PromptListRequest request) {
         int page = Pagination.normalizePage(request.page());
@@ -89,6 +92,32 @@ public class PromptService {
         return assigned.stream()
                 .map(prompt -> toAssignedItem(prompt, categoriesByPrompt.getOrDefault(prompt.getId(), List.of())))
                 .toList();
+    }
+
+    public PromptDetailsResponse getDetails(UUID userId, PromptDetailsRequest request) {
+        Prompt prompt = promptRepository.findById(request.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
+        Level level = levelRepository.findById(prompt.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+
+        List<CategorySummary> categories = promptRepository.findCategoriesForPrompts(List.of(prompt.getId())).stream()
+                .map(c -> new CategorySummary(c.getId(), c.getName()))
+                .toList();
+
+        PromptSubmissionProjection submission = promptRepository
+                .findSubmissionsForAccess(access.getId(), List.of(prompt.getId())).stream()
+                .findFirst()
+                .orElse(null);
+
+        return new PromptDetailsResponse(prompt.getId(), prompt.getName(), prompt.getScenario(),
+                prompt.getExpectedOutput(), level.getId(), level.getLevelNumber(), categories, prompt.getXpReward(),
+                prompt.getIsSelfCreated(),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getDeadlineAt()),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
+                submission == null ? null : submission.getIsAccepted());
     }
 
     private PromptAssignedItem toAssignedItem(PromptAssignedProjection prompt, List<CategorySummary> categories) {

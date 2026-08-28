@@ -46,4 +46,14 @@ public class UseCaseController {
         List<UseCaseAssignedItem> response = useCaseService.listAssigned(userId, request);
         return ApiResponse.success(HttpStatus.OK, "assigned use cases retrieved successfully", response);
     }
+
+    @PostMapping("/details")
+    public ResponseEntity<ApiResponse<UseCaseDetailsResponse>> details(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody UseCaseDetailsRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        UseCaseDetailsResponse response = useCaseService.getDetails(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "use case retrieved successfully", response);
+    }
 }

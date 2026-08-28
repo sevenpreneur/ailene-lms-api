@@ -141,3 +141,64 @@ Same shape and cases as `POST /api/v1/prompts` above (missing/invalid auth, expi
 | Code | Status | Message | When |
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for this `project_id` |
+
+### `POST {base_url}/api/v1/prompts/details`
+
+Returns one prompt's full detail by id — unlike the list/assigned endpoints above, this doesn't filter by `status`/`is_self_created`, so it also works for a self-created or inactive prompt as long as the id exists and the caller has access to its project.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "id": 1
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | integer | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "prompt retrieved successfully",
+  "data": {
+    "id": 1,
+    "name": "Draft Job Description",
+    "scenario": "Anda adalah HR Generalist yang baru menerima permintaan rekrutmen...",
+    "expected_output": "Draft job description lengkap dengan judul, tanggung jawab, dan kualifikasi...",
+    "level_id": 3,
+    "level_number": 2,
+    "categories": [
+      { "id": 87, "name": "Human Capital" }
+    ],
+    "xp_reward": 70,
+    "is_self_created": false,
+    "deadline_at": "2026-08-27T17:16:17.902873Z",
+    "submitted_at": "2026-08-24T17:16:17.902873Z",
+    "reviewed_at": null,
+    "is_accepted": true
+  }
+}
+```
+
+`scenario`/`expected_output` are `lms_prompts.scenario`/`expected_output` directly. `level_id`/`level_number` are resolved from `lms_prompts.level_id` — `project_id` isn't part of the request, it's derived from there to check the caller's access. `deadline_at`/`submitted_at`/`reviewed_at`/`is_accepted` reflect the caller's own submission for this prompt (from their `lms_accesses` row in the prompt's project), same semantics as the list endpoint above — all `null` if they have no submission yet.
+
+**Errors**
+
+All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
+| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
+| 400 | `BAD_REQUEST` | `id: must not be null` | missing `id` field |
+| 404 | `NOT_FOUND` | `Prompt not found` | no `lms_prompts` row matches `id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the prompt's project |

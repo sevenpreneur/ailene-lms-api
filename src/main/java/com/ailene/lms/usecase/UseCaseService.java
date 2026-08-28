@@ -9,6 +9,8 @@ import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.common.pagination.PageMeta;
 import com.ailene.lms.common.pagination.PagedResponse;
 import com.ailene.lms.common.pagination.Pagination;
+import com.ailene.lms.level.Level;
+import com.ailene.lms.level.LevelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +26,7 @@ public class UseCaseService {
 
     private final UseCaseRepository useCaseRepository;
     private final AccessRepository accessRepository;
+    private final LevelRepository levelRepository;
 
     public PagedResponse<UseCaseListItem> list(UUID userId, UseCaseListRequest request) {
         int page = Pagination.normalizePage(request.page());
@@ -89,6 +92,32 @@ public class UseCaseService {
         return assigned.stream()
                 .map(useCase -> toAssignedItem(useCase, categoriesByUseCase.getOrDefault(useCase.getId(), List.of())))
                 .toList();
+    }
+
+    public UseCaseDetailsResponse getDetails(UUID userId, UseCaseDetailsRequest request) {
+        UseCase useCase = useCaseRepository.findById(request.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
+        Level level = levelRepository.findById(useCase.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+
+        List<CategorySummary> categories = useCaseRepository.findCategoriesForUseCases(List.of(useCase.getId()))
+                .stream()
+                .map(c -> new CategorySummary(c.getId(), c.getName()))
+                .toList();
+
+        UseCaseSubmissionProjection submission = useCaseRepository
+                .findSubmissionsForAccess(access.getId(), List.of(useCase.getId())).stream()
+                .findFirst()
+                .orElse(null);
+
+        return new UseCaseDetailsResponse(useCase.getId(), useCase.getName(), useCase.getDescription(),
+                level.getId(), level.getLevelNumber(), categories, useCase.getXpReward(), useCase.getIsSelfCreated(),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getDeadlineAt()),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
+                TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
+                submission == null ? null : submission.getIsAccepted());
     }
 
     private UseCaseAssignedItem toAssignedItem(UseCaseAssignedProjection useCase, List<CategorySummary> categories) {

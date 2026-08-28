@@ -30,6 +30,8 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 | `material` | `Material` entity + `/api/v1/materials/*` endpoints (`MaterialController`, `MaterialService`) — reading one material's full detail, marking it complete, and listing every material in the same level (`in-level`); listing materials per chapter lives in `learnings` |
 | `video` | `Video` entity + `/api/v1/videos/*` endpoints (`VideoController`, `VideoService`) — reading one video's full detail and marking it complete; listing lives in `learnings` |
 | `quiz` | `Quiz`/`QuizSubmission` entities + `/api/v1/quizzes/*` endpoints (`QuizController`, `QuizService`) — question list, attempt start/resume/autosave/submit, result, plus the QStash-driven `auto-submit` callback |
+| `prompt` | `Prompt` entity (`lms_prompts`) + `/api/v1/prompts/*` endpoints (`PromptController`, `PromptService`) — paginated library list, the caller's own assigned prompts, and reading one prompt's full detail by id (`details`) |
+| `usecase` | `UseCase` entity (`lms_use_cases`) + `/api/v1/use-cases/*` endpoints (`UseCaseController`, `UseCaseService`) — mirrors `prompt` exactly, backed by `lms_use_cases`/`lms_use_case_submissions` |
 | `common.response` | `ApiResponse<T>` envelope, `StatusName` |
 | `common.exception` | `GlobalExceptionHandler`, sentinel exception classes |
 | `common.security` | `SecretKeyGuard` — the shared `Bearer` header parsing + `SECRET_KEY` comparison, used by both `auth` and `hello` |
