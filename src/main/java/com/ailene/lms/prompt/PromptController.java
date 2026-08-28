@@ -76,4 +76,14 @@ public class PromptController {
         PromptDetailsResponse response = promptService.selfAssign(userId, request);
         return ApiResponse.success(HttpStatus.OK, "prompt self-assigned successfully", response);
     }
+
+    @PostMapping("/submit")
+    public ResponseEntity<ApiResponse<PromptDetailsResponse>> submit(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PromptSubmitRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        PromptDetailsResponse response = promptService.submit(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "prompt submitted successfully", response);
+    }
 }

@@ -331,7 +331,7 @@ Lets a student pick an existing prompt from the curated library themselves and p
 }
 ```
 
-Same response shape as `POST /api/v1/prompts/details`. `project_id` isn't part of the request — it's resolved internally from `prompt_id` via the prompt's level, same as `details`. Unlike `self-create`, `submitted_at` stays `null` here — this endpoint only reserves the prompt into the champion's queue, it doesn't submit `input`/`output` (there's no submit endpoint for this flow yet — see `Known gaps` in `AGENTS.md`).
+Same response shape as `POST /api/v1/prompts/details`. `project_id` isn't part of the request — it's resolved internally from `prompt_id` via the prompt's level, same as `details`. Unlike `self-create`, `submitted_at` stays `null` here — this endpoint only reserves the prompt into the champion's queue, it doesn't submit `input`/`output`. Call `POST /api/v1/prompts/submit` below once it's ready.
 
 **Errors**
 
@@ -347,3 +347,72 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the prompt's project |
 | 400 | `BAD_REQUEST` | `You're not part of a group yet, so self-assigned practice isn't available.` | the caller's access has no `group_id` |
 | 404 | `NOT_FOUND` | `No champion found for this group` | no `lms_accesses` row has `role = 'champion'` for that project + `group_id` |
+
+### `POST {base_url}/api/v1/prompts/submit`
+
+Submits (or resubmits) the caller's `input`/`output` for a prompt that's already routed to a champion — either via `self-assign` above or a champion-assigned task. Overwrites whatever was submitted before and bumps `submitted_at` to now, so it can be called repeatedly while awaiting review. Once a champion has accepted the submission, further calls are rejected — the student has to be reassigned (or self-assign again) to get another shot.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "prompt_id": 3,
+  "input": "Tulis 10 pertanyaan wawancara untuk kandidat posisi Data Analyst yang menguji kemampuan SQL dan storytelling data.",
+  "output": "1. Ceritakan pengalaman Anda membersihkan dataset yang berantakan...\n2. ..."
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `prompt_id` | integer | yes | |
+| `input` | string | yes | The prompt the student actually wrote. Max 5000 chars. |
+| `output` | string | yes | The AI's actual output for that prompt. Max 10000 chars. |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "prompt submitted successfully",
+  "data": {
+    "id": 3,
+    "name": "Interview Question Generator",
+    "scenario": "Anda akan mewawancarai kandidat untuk posisi Data Analyst...",
+    "expected_output": "Daftar 10 pertanyaan wawancara yang relevan...",
+    "level_id": 3,
+    "level_number": 2,
+    "categories": [
+      { "id": 87, "name": "Human Capital" }
+    ],
+    "xp_reward": 70,
+    "is_self_created": false,
+    "deadline_at": null,
+    "submitted_at": "2026-08-28T12:00:00.000Z",
+    "reviewed_at": null,
+    "is_accepted": false
+  }
+}
+```
+
+Same response shape as `POST /api/v1/prompts/details`. `project_id` isn't part of the request — it's resolved internally from `prompt_id` via the prompt's level, same as `details`. The `input`/`output` you sent aren't part of this response, since `/details` doesn't surface submission content at all — only `submitted_at` moves.
+
+**Errors**
+
+All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
+| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
+| 400 | `BAD_REQUEST` | `promptId: must not be null` | missing `prompt_id` field |
+| 400 | `BAD_REQUEST` | `input: must not be blank` | missing/empty `input` field |
+| 400 | `BAD_REQUEST` | `output: must not be blank` | missing/empty `output` field |
+| 404 | `NOT_FOUND` | `Prompt not found` | no `lms_prompts` row matches `prompt_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the prompt's project |
+| 404 | `NOT_FOUND` | `Assignment not found` | no `lms_prompt_submissions` row exists for `(caller, prompt_id)`, or it exists but `assigned_by_access_id` is still empty — call `self-assign` first, or wait for a champion to assign it |
+| 400 | `BAD_REQUEST` | `Assignment already accepted, cannot resubmit.` | the submission's `is_accepted` is already `true` |

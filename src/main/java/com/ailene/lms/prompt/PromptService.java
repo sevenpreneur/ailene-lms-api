@@ -209,6 +209,31 @@ public class PromptService {
         return getDetails(userId, new PromptDetailsRequest(prompt.getId()));
     }
 
+    @Transactional
+    public PromptDetailsResponse submit(UUID userId, PromptSubmitRequest request) {
+        Prompt prompt = promptRepository.findById(request.promptId())
+                .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
+        Level level = levelRepository.findById(prompt.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+
+        PromptSubmission submission = promptSubmissionRepository
+                .findByStudentAccessIdAndPromptId(access.getId(), prompt.getId())
+                .filter(s -> s.getAssignedByAccessId() != null)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
+        if (Boolean.TRUE.equals(submission.getIsAccepted())) {
+            throw new BadRequestException("Assignment already accepted, cannot resubmit.");
+        }
+
+        submission.setInput(request.input());
+        submission.setOutput(request.output());
+        submission.setSubmittedAt(OffsetDateTime.now());
+        promptSubmissionRepository.save(submission);
+
+        return getDetails(userId, new PromptDetailsRequest(prompt.getId()));
+    }
+
     private PromptAssignedItem toAssignedItem(PromptAssignedProjection prompt, List<CategorySummary> categories) {
         AssignedByUser assignedBy = prompt.getAssignedById() == null ? null
                 : new AssignedByUser(prompt.getAssignedById(), prompt.getAssignedByName(),

@@ -76,4 +76,14 @@ public class UseCaseController {
         UseCaseDetailsResponse response = useCaseService.selfAssign(userId, request);
         return ApiResponse.success(HttpStatus.OK, "use case self-assigned successfully", response);
     }
+
+    @PostMapping("/submit")
+    public ResponseEntity<ApiResponse<UseCaseDetailsResponse>> submit(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody UseCaseSubmitRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        UseCaseDetailsResponse response = useCaseService.submit(userId, request);
+        return ApiResponse.success(HttpStatus.OK, "use case submitted successfully", response);
+    }
 }

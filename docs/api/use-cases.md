@@ -338,7 +338,7 @@ Lets a student pick an existing use case from the curated library themselves and
 }
 ```
 
-Same response shape as `POST /api/v1/use-cases/details`. `project_id` isn't part of the request — it's resolved internally from `use_case_id` via the use case's level, same as `details`. Unlike `self-create`, `submitted_at` stays `null` here — this endpoint only reserves the use case into the champion's queue, it doesn't submit the practice write-up (there's no submit endpoint for this flow yet — see `Known gaps` in `AGENTS.md`).
+Same response shape as `POST /api/v1/use-cases/details`. `project_id` isn't part of the request — it's resolved internally from `use_case_id` via the use case's level, same as `details`. Unlike `self-create`, `submitted_at` stays `null` here — this endpoint only reserves the use case into the champion's queue, it doesn't submit the practice write-up. Call `POST /api/v1/use-cases/submit` below once it's ready.
 
 **Errors**
 
@@ -354,3 +354,86 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the use case's project |
 | 400 | `BAD_REQUEST` | `You're not part of a group yet, so self-assigned practice isn't available.` | the caller's access has no `group_id` |
 | 404 | `NOT_FOUND` | `No champion found for this group` | no `lms_accesses` row has `role = 'champion'` for that project + `group_id` |
+
+### `POST {base_url}/api/v1/use-cases/submit`
+
+Submits (or resubmits) the caller's practice write-up for a use case that's already routed to a champion — either via `self-assign` above or a champion-assigned task. Mirrors `POST /api/v1/prompts/submit` exactly. Overwrites whatever was submitted before and bumps `submitted_at` to now, so it can be called repeatedly while awaiting review. Once a champion has accepted the submission, further calls are rejected — the student has to be reassigned (or self-assign again) to get another shot.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{
+  "use_case_id": 1,
+  "outcome_proof": "Screenshot draft balasan email otomatis: https://example.com/proof.png",
+  "hours_with_ai": 1.5,
+  "hours_without_ai": 4,
+  "description": "Menggunakan AI untuk menyusun draft balasan email customer support dari tiket yang masuk.",
+  "ai_tool": "ChatGPT",
+  "frequency": "weekly",
+  "type": "workflow_automation"
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `use_case_id` | integer | yes | |
+| `outcome_proof` | string | yes | Max 500 chars. |
+| `hours_with_ai` | number | yes | 0–9999.99. |
+| `hours_without_ai` | number | yes | 0–9999.99. |
+| `description` | string | yes | Max 5000 chars. |
+| `ai_tool` | string | yes | Max 255 chars. |
+| `frequency` | string | yes | `daily` / `weekly` / `monthly` / `occasionally`. |
+| `type` | string | yes | `workflow_automation` / `content_creation` / `data_analysis` / `research` / `communication` / `decision_support` / `learning` / `other`. |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "use case submitted successfully",
+  "data": {
+    "id": 1,
+    "name": "Otomasi Screening CV Massal",
+    "description": "Tim recruiter menerima ratusan CV untuk satu lowongan...",
+    "level_id": 3,
+    "level_number": 2,
+    "categories": [
+      { "id": 87, "name": "Human Capital" }
+    ],
+    "xp_reward": 70,
+    "is_self_created": false,
+    "deadline_at": null,
+    "submitted_at": "2026-08-28T12:05:00.000Z",
+    "reviewed_at": null,
+    "is_accepted": false
+  }
+}
+```
+
+Same response shape as `POST /api/v1/use-cases/details`. `project_id` isn't part of the request — it's resolved internally from `use_case_id` via the use case's level, same as `details`. None of `outcome_proof`/`hours_with_ai`/`hours_without_ai`/`ai_tool`/`frequency`/`type` you sent are part of this response, since `/details` doesn't surface submission content at all — only `submitted_at` moves. Note `description` here is `lms_use_cases.description` (the library item's description), not the practice write-up's `description` field — those are two different columns that happen to share a name.
+
+**Errors**
+
+All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
+| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
+| 400 | `BAD_REQUEST` | `useCaseId: must not be null` | missing `use_case_id` field |
+| 400 | `BAD_REQUEST` | `outcomeProof: must not be blank` | missing/empty `outcome_proof` field |
+| 400 | `BAD_REQUEST` | `hoursWithAi: must not be null` | missing `hours_with_ai` field |
+| 400 | `BAD_REQUEST` | `hoursWithoutAi: must not be null` | missing `hours_without_ai` field |
+| 400 | `BAD_REQUEST` | `description: must not be blank` | missing/empty `description` field |
+| 400 | `BAD_REQUEST` | `aiTool: must not be blank` | missing/empty `ai_tool` field |
+| 400 | `BAD_REQUEST` | `frequency: must not be null` | missing `frequency` field |
+| 400 | `BAD_REQUEST` | `type: must not be null` | missing `type` field |
+| 404 | `NOT_FOUND` | `Use case not found` | no `lms_use_cases` row matches `use_case_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the use case's project |
+| 404 | `NOT_FOUND` | `Assignment not found` | no `lms_use_case_submissions` row exists for `(caller, use_case_id)`, or it exists but `assigned_by_access_id` is still empty — call `self-assign` first, or wait for a champion to assign it |
+| 400 | `BAD_REQUEST` | `Assignment already accepted, cannot resubmit.` | the submission's `is_accepted` is already `true` |

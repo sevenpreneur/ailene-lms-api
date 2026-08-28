@@ -212,6 +212,36 @@ public class UseCaseService {
         return getDetails(userId, new UseCaseDetailsRequest(useCase.getId()));
     }
 
+    @Transactional
+    public UseCaseDetailsResponse submit(UUID userId, UseCaseSubmitRequest request) {
+        UseCase useCase = useCaseRepository.findById(request.useCaseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
+        Level level = levelRepository.findById(useCase.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
+        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
+
+        UseCaseSubmission submission = useCaseSubmissionRepository
+                .findByStudentAccessIdAndUseCaseId(access.getId(), useCase.getId())
+                .filter(s -> s.getAssignedByAccessId() != null)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
+        if (Boolean.TRUE.equals(submission.getIsAccepted())) {
+            throw new BadRequestException("Assignment already accepted, cannot resubmit.");
+        }
+
+        submission.setOutcomeProof(request.outcomeProof());
+        submission.setHoursWithAi(request.hoursWithAi());
+        submission.setHoursWithoutAi(request.hoursWithoutAi());
+        submission.setDescription(request.description());
+        submission.setAiTool(request.aiTool());
+        submission.setFrequency(request.frequency());
+        submission.setType(request.type());
+        submission.setSubmittedAt(OffsetDateTime.now());
+        useCaseSubmissionRepository.save(submission);
+
+        return getDetails(userId, new UseCaseDetailsRequest(useCase.getId()));
+    }
+
     private UseCaseAssignedItem toAssignedItem(UseCaseAssignedProjection useCase, List<CategorySummary> categories) {
         AssignedByUser assignedBy = useCase.getAssignedById() == null ? null
                 : new AssignedByUser(useCase.getAssignedById(), useCase.getAssignedByName(),
