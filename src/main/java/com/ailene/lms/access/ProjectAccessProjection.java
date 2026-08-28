@@ -12,4 +12,6 @@ public interface ProjectAccessProjection {
     String getGroupName();
 
     String getRole();
+
+    Boolean getHasPreAssessment();
 }

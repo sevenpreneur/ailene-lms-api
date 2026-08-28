@@ -19,7 +19,8 @@ public interface AccessRepository extends JpaRepository<Access, String> {
                    c.image_url AS avatar,
                    g.id AS groupId,
                    g.name AS groupName,
-                   a.role AS role
+                   a.role AS role,
+                   EXISTS (SELECT 1 FROM lms_pre_assessments pa WHERE pa.access_id = a.id) AS hasPreAssessment
             FROM lms_accesses a
             JOIN lms_projects p ON p.id = a.project_id
             LEFT JOIN b2b_company c ON c.id = p.company_id

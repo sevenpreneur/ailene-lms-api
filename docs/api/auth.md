@@ -103,14 +103,15 @@ No request body.
         "avatar": "https://.../logo-hk.webp",
         "group_id": 12,
         "group_name": "Batch 1",
-        "role": "champion"
+        "role": "champion",
+        "has_pre_assessment": false
       }
     ]
   }
 }
 ```
 
-`data.user` is fetched fresh from `lms_users` on every call (not decoded from the JWT), so it reflects any profile changes made since the token was issued. `data.project_access` lists every `lms_accesses` row for this user — one entry per project they have a role on (`champion`, `student`, or `sponsor`); `avatar` is that project's `b2b_company.image_url` and can be `null` if the project has no `company_id` or the company has no logo set. `group_id` and `group_name` identify the user's group in that project and are both `null` when the access isn't assigned to a group. An empty array means the user isn't attached to any project yet.
+`data.user` is fetched fresh from `lms_users` on every call (not decoded from the JWT), so it reflects any profile changes made since the token was issued. `data.project_access` lists every `lms_accesses` row for this user — one entry per project they have a role on (`champion`, `student`, or `sponsor`); `avatar` is that project's `b2b_company.image_url` and can be `null` if the project has no `company_id` or the company has no logo set. `group_id` and `group_name` identify the user's group in that project and are both `null` when the access isn't assigned to a group. `has_pre_assessment` is `true` when this access already has an `lms_pre_assessments` row (see `docs/api/pre-assessment.md`) — a submitted pre-assessment is one-shot, so this is how the client knows whether to show the questionnaire or the report. An empty array means the user isn't attached to any project yet.
 
 **Errors**
 

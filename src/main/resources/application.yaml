@@ -38,6 +38,9 @@ qstash:
   url: ${QSTASH_URL:}
   token: ${QSTASH_TOKEN:}
 
+openai:
+  api-key: ${OPENAI_API_KEY:}
+
 management:
   endpoints:
     web:

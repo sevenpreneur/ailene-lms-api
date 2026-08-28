@@ -31,6 +31,10 @@ public class QStashClient {
         this.secretKey = secretKey;
     }
 
+    public void publish(String path, Object body) {
+        publishDelayed(path, body, 0);
+    }
+
     // Callback route is SECRET_KEY-gated; forwarded via Upstash-Forward-Authorization so delivery passes SecretKeyGuard.
     public void publishDelayed(String path, Object body, long delaySeconds) {
         if (qstashToken == null || qstashToken.isBlank() || appBaseUrl == null || appBaseUrl.isBlank()) {
