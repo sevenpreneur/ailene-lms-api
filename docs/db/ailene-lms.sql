@@ -602,6 +602,55 @@ ALTER TABLE lms_pre_assessment_reports
 ALTER TABLE lms_announcement
   ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
 
+-------------
+-- Indexes --
+-------------
+
+-- LMS program structure
+
+CREATE INDEX idx_lms_projects_company_id             ON lms_projects (company_id);
+CREATE INDEX idx_lms_projects_pipeline_id            ON lms_projects (pipeline_id);
+CREATE INDEX idx_lms_levels_project_id               ON lms_levels (project_id);
+CREATE INDEX idx_lms_chapters_level_id               ON lms_chapters (level_id);
+CREATE INDEX idx_lms_chapters_trainer_id             ON lms_chapters (trainer_id);
+CREATE INDEX idx_lms_ctr_trainer_id                  ON lms_chapter_trainer_requests (trainer_id);
+CREATE INDEX idx_lms_ctr_reviewed_by                 ON lms_chapter_trainer_requests (reviewed_by);
+
+-- LMS content
+
+CREATE INDEX idx_lms_materials_chapter_id            ON lms_materials (chapter_id);
+CREATE INDEX idx_lms_videos_chapter_id               ON lms_videos (chapter_id);
+CREATE INDEX idx_lms_quizzes_chapter_id              ON lms_quizzes (chapter_id);
+CREATE INDEX idx_lms_quiz_questions_quiz_id          ON lms_quiz_questions (quiz_id);
+CREATE INDEX idx_lms_quiz_options_question_id        ON lms_quiz_options (question_id);
+
+-- LMS categories, prompts & use cases
+
+CREATE INDEX idx_lms_prompts_level_id                ON lms_prompts (level_id);
+CREATE INDEX idx_lms_prompt_categories_category_id   ON lms_prompt_categories (category_id);
+CREATE INDEX idx_lms_use_cases_level_id              ON lms_use_cases (level_id);
+CREATE INDEX idx_lms_use_case_categories_category_id ON lms_use_case_categories (category_id);
+
+-- LMS users & progress
+
+CREATE INDEX idx_lms_tokens_user_id                  ON lms_tokens (user_id);
+CREATE INDEX idx_lms_groups_project_id               ON lms_groups (project_id);
+CREATE INDEX idx_lms_accesses_user_id                ON lms_accesses (user_id);
+CREATE INDEX idx_lms_accesses_group_id               ON lms_accesses (group_id, project_id);
+CREATE INDEX idx_lms_accesses_current_level_id       ON lms_accesses (current_level_id, project_id);
+CREATE INDEX idx_lms_level_history_level_id          ON lms_level_history (level_id);
+CREATE INDEX idx_lms_coaching_notes_student          ON lms_coaching_notes (student_access_id);
+CREATE INDEX idx_lms_coaching_notes_champion         ON lms_coaching_notes (champion_access_id);
+CREATE INDEX idx_lms_material_completions_material   ON lms_material_completions (material_id);
+CREATE INDEX idx_lms_video_completions_video_id      ON lms_video_completions (video_id);
+CREATE INDEX idx_lms_quiz_submissions_quiz_id        ON lms_quiz_submissions (quiz_id);
+CREATE INDEX idx_lms_prompt_subs_prompt_id           ON lms_prompt_submissions (prompt_id);
+CREATE INDEX idx_lms_prompt_subs_assigned_by         ON lms_prompt_submissions (assigned_by_access_id);
+CREATE INDEX idx_lms_prompt_subs_reviewed_by         ON lms_prompt_submissions (reviewed_by_access_id);
+CREATE INDEX idx_lms_use_case_subs_use_case_id       ON lms_use_case_submissions (use_case_id);
+CREATE INDEX idx_lms_use_case_subs_assigned_by       ON lms_use_case_submissions (assigned_by_access_id);
+CREATE INDEX idx_lms_use_case_subs_reviewed_by       ON lms_use_case_submissions (reviewed_by_access_id);
+
 ---------------
 -- Functions --
 ---------------
