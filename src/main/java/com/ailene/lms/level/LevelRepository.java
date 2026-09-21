@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface LevelRepository extends JpaRepository<Level, Integer> {
 
-    List<Level> findByProjectIdAndStatusOrderByLevelNumberAsc(String projectId, Status status);
+    List<Level> findByStatusOrderByLevelNumberAsc(Status status);
 
     Optional<Level> findByLevelNumber(Short levelNumber);
 }

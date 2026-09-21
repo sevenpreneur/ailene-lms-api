@@ -27,7 +27,7 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             FROM lms_accesses a
             JOIN lms_users u ON u.id = a.user_id
             LEFT JOIN lms_groups g ON g.id = a.group_id AND g.project_id = a.project_id
-            LEFT JOIN lms_levels lv ON lv.id = a.current_level_id AND lv.project_id = a.project_id
+            LEFT JOIN lms_levels lv ON lv.id = a.current_level_id
             WHERE a.project_id = :projectId AND a.group_id = :groupId AND a.id <> :championAccessId
             ORDER BY u.full_name ASC
             """, nativeQuery = true)
@@ -46,18 +46,27 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
               (SELECT COUNT(*) FROM lms_materials m
                  JOIN lms_chapters c ON c.id = m.chapter_id
                  JOIN lms_levels lv ON lv.id = c.level_id
-                 WHERE lv.project_id = :projectId AND c.status = 'active' AND m.status = 'active') +
+                 WHERE c.project_id = :projectId AND c.status = 'active' AND m.status = 'active'
+                   AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                WHERE s.chapter_id = c.id AND s.status = 'active'
+                                  AND (s.only_group_id IS NULL OR s.only_group_id = :groupId))) +
               (SELECT COUNT(*) FROM lms_videos v
                  JOIN lms_chapters c ON c.id = v.chapter_id
                  JOIN lms_levels lv ON lv.id = c.level_id
-                 WHERE lv.project_id = :projectId AND c.status = 'active' AND v.status = 'active') +
+                 WHERE c.project_id = :projectId AND c.status = 'active' AND v.status = 'active'
+                   AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                WHERE s.chapter_id = c.id AND s.status = 'active'
+                                  AND (s.only_group_id IS NULL OR s.only_group_id = :groupId))) +
               (SELECT COUNT(*) FROM lms_quizzes q
                  JOIN lms_chapters c ON c.id = q.chapter_id
                  JOIN lms_levels lv ON lv.id = c.level_id
-                 WHERE lv.project_id = :projectId AND c.status = 'active' AND q.status = 'active')
+                 WHERE c.project_id = :projectId AND c.status = 'active' AND q.status = 'active'
+                   AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                WHERE s.chapter_id = c.id AND s.status = 'active'
+                                  AND (s.only_group_id IS NULL OR s.only_group_id = :groupId)))
             )
             """, nativeQuery = true)
-    long countLearningTasks(@Param("projectId") String projectId);
+    long countLearningTasks(@Param("projectId") String projectId, @Param("groupId") Integer groupId);
 
     @Query(value = """
             SELECT t.access_id AS accessId, SUM(t.done_count) AS doneCount FROM (
@@ -358,29 +367,36 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             SELECT (
                      (SELECT COUNT(*) FROM lms_quizzes q
                         JOIN lms_chapters c ON c.id = q.chapter_id
-                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND q.status = 'active') +
+                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                      WHERE s.chapter_id = c.id AND s.status = 'active'
+                                        AND (s.only_group_id IS NULL OR s.only_group_id = a.group_id)) AND q.status = 'active') +
                      (SELECT COUNT(*) FROM lms_materials m
                         JOIN lms_chapters c ON c.id = m.chapter_id
-                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND m.status = 'active')
+                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                      WHERE s.chapter_id = c.id AND s.status = 'active'
+                                        AND (s.only_group_id IS NULL OR s.only_group_id = a.group_id)) AND m.status = 'active')
                    ) AS required,
                    (
                      (SELECT COUNT(DISTINCT qs.quiz_id) FROM lms_quiz_submissions qs
                         JOIN lms_quizzes q ON q.id = qs.quiz_id
                         JOIN lms_chapters c ON c.id = q.chapter_id
-                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND q.status = 'active'
+                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                      WHERE s.chapter_id = c.id AND s.status = 'active'
+                                        AND (s.only_group_id IS NULL OR s.only_group_id = a.group_id)) AND q.status = 'active'
                           AND qs.student_access_id = a.id AND qs.is_completed = true) +
                      (SELECT COUNT(*) FROM lms_material_completions mc
                         JOIN lms_materials m ON m.id = mc.material_id
                         JOIN lms_chapters c ON c.id = m.chapter_id
-                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND m.status = 'active'
+                        WHERE c.level_id = a.current_level_id AND c.status = 'active' AND EXISTS (SELECT 1 FROM lms_chapter_sessions s
+                                      WHERE s.chapter_id = c.id AND s.status = 'active'
+                                        AND (s.only_group_id IS NULL OR s.only_group_id = a.group_id)) AND m.status = 'active'
                           AND mc.student_access_id = a.id)
                    ) AS done,
                    next_level.id AS nextLevelId,
                    next_level.level_number AS nextLevelNumber
             FROM lms_accesses a
             LEFT JOIN lms_levels cur ON cur.id = a.current_level_id
-            LEFT JOIN lms_levels next_level ON next_level.project_id = a.project_id
-                 AND next_level.status = 'active'
+            LEFT JOIN lms_levels next_level ON next_level.status = 'active'
                  AND next_level.level_number = COALESCE(cur.level_number, 0) + 1
             WHERE a.id = :accessId
             """, nativeQuery = true)

@@ -260,19 +260,19 @@ public class QuizService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chapter not found"));
         Level level = levelRepository.findById(chapter.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
         return new AccessContext(access, chapter, level);
     }
 
     private AccessContext resolveAccessAndRequireUnlock(UUID userId, Quiz quiz) {
         AccessContext ctx = resolveAccess(userId, quiz);
-        requireLevelUnlocked(userId, ctx.level());
+        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
         return ctx;
     }
 
-    private void requireLevelUnlocked(UUID userId, Level level) {
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, level.getProjectId())
+    private void requireLevelUnlocked(UUID userId, String projectId, Level level) {
+        StudentStatusProjection status = accessRepository.findStudentStatus(userId, projectId)
                 .orElse(null);
         short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
                 : status.getCurrentLevelNumber();

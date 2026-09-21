@@ -342,7 +342,7 @@ public class SponsorService {
         Instant activeSince = Instant.now().minus(ACTIVE_WINDOW_DAYS, ChronoUnit.DAYS);
 
         Map<Short, LevelRowProjection> levelByNumber = new HashMap<>();
-        for (LevelRowProjection level : sponsorRepository.findActiveLevels(projectId)) {
+        for (LevelRowProjection level : sponsorRepository.findActiveLevels()) {
             levelByNumber.put(level.getLevelNumber(), level);
         }
 
@@ -496,7 +496,7 @@ public class SponsorService {
         List<GroupRowProjection> groups = sponsorRepository.findGroups(projectId);
 
         short maxScore = 3;
-        for (LevelRowProjection level : sponsorRepository.findActiveLevels(projectId)) {
+        for (LevelRowProjection level : sponsorRepository.findActiveLevels()) {
             if (level.getLevelNumber() != null && level.getLevelNumber() > maxScore) {
                 maxScore = level.getLevelNumber();
             }

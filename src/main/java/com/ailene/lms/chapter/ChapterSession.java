@@ -17,27 +17,46 @@ import org.hibernate.type.SqlTypes;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "lms_chapters")
+@Table(name = "lms_chapter_sessions")
 @Getter
 @Setter
-public class Chapter {
+public class ChapterSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "level_id", nullable = false)
-    private Integer levelId;
+    @Column(name = "chapter_id", nullable = false)
+    private Integer chapterId;
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "project_id", length = 21, nullable = false)
     private String projectId;
 
-    @Column(nullable = false)
-    private String name;
+    // null means the session is open to every group in the project
+    @Column(name = "only_group_id")
+    private Integer onlyGroupId;
 
-    @Column
-    private String description;
+    @Column(name = "session_date", nullable = false)
+    private OffsetDateTime sessionDate;
+
+    @Column(name = "duration_minutes", nullable = false)
+    private Integer durationMinutes;
+
+    @Column(name = "location_name", nullable = false)
+    private String locationName;
+
+    @Column(name = "location_url", nullable = false)
+    private String locationUrl;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false)
+    private ChapterMethod method;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "trainer_id", length = 21)
+    private String trainerId;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)

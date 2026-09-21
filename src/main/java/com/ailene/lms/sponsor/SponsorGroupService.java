@@ -113,7 +113,7 @@ public class SponsorGroupService {
             }
         }
 
-        List<GroupLevelItem> levels = sponsorRepository.findActiveLevels(projectId).stream()
+        List<GroupLevelItem> levels = sponsorRepository.findActiveLevels().stream()
                 .map(level -> {
                     int count = countByLevel.getOrDefault(level.getId(), 0);
                     return new GroupLevelItem(level.getId(), level.getLevelNumber(),

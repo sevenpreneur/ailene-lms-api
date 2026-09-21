@@ -36,7 +36,7 @@ public class VideoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Video not found"));
         Chapter chapter = resolveChapter(video.getChapterId());
         AccessContext ctx = resolveAccess(userId, chapter);
-        requireLevelUnlocked(userId, ctx.level());
+        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
         Access access = ctx.access();
 
         var completion = videoRepository.findCompletion(video.getId(), access.getId());
@@ -56,7 +56,7 @@ public class VideoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Video not found"));
         Chapter chapter = resolveChapter(video.getChapterId());
         AccessContext ctx = resolveAccess(userId, chapter);
-        requireLevelUnlocked(userId, ctx.level());
+        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
         Access access = ctx.access();
 
         videoRepository.insertCompletion(video.getId(), access.getId());
@@ -77,13 +77,13 @@ public class VideoService {
     private AccessContext resolveAccess(UUID userId, Chapter chapter) {
         Level level = levelRepository.findById(chapter.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
         return new AccessContext(access, level);
     }
 
-    private void requireLevelUnlocked(UUID userId, Level level) {
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, level.getProjectId())
+    private void requireLevelUnlocked(UUID userId, String projectId, Level level) {
+        StudentStatusProjection status = accessRepository.findStudentStatus(userId, projectId)
                 .orElse(null);
         short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
                 : status.getCurrentLevelNumber();

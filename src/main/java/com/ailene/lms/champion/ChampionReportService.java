@@ -74,8 +74,7 @@ public class ChampionReportService {
                         && Boolean.TRUE.equals(row.getAccepted()))
                 .count();
 
-        List<Level> levels = levelRepository.findByProjectIdAndStatusOrderByLevelNumberAsc(request.projectId(),
-                Status.active);
+        List<Level> levels = levelRepository.findByStatusOrderByLevelNumberAsc(Status.active);
         List<TeamLevelHistoryProjection> history = accessIds.isEmpty() ? List.of()
                 : championRepository.findTeamLevelHistory(accessIds);
 

@@ -89,6 +89,7 @@ public class ChampionAssignmentService {
 
         Prompt prompt = new Prompt();
         prompt.setLevelId(level.getId());
+        prompt.setOnlyProjectId(request.projectId());
         prompt.setName(request.name());
         prompt.setScenario(request.description());
         prompt.setExpectedOutput(request.expectedOutput());
@@ -128,6 +129,7 @@ public class ChampionAssignmentService {
 
         UseCase useCase = new UseCase();
         useCase.setLevelId(level.getId());
+        useCase.setOnlyProjectId(request.projectId());
         useCase.setName(request.name());
         useCase.setDescription(request.description());
         useCase.setStatus(Status.active);

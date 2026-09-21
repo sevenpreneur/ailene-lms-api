@@ -42,8 +42,16 @@ public interface VideoRepository extends JpaRepository<Video, Integer> {
             FROM lms_videos v
             JOIN lms_chapters c ON c.id = v.chapter_id AND c.status = 'active'
             JOIN lms_levels lv ON lv.id = c.level_id
-            WHERE lv.project_id = :projectId AND v.status = 'active'
-            ORDER BY c.session_date ASC, v.order_index ASC
+            JOIN LATERAL (
+              SELECT s.session_date
+              FROM lms_chapter_sessions s
+              WHERE s.chapter_id = c.id AND s.status = 'active'
+                AND (s.only_group_id IS NULL OR s.only_group_id = (SELECT a.group_id FROM lms_accesses a WHERE a.id = :accessId))
+              ORDER BY (s.only_group_id IS NULL)
+              LIMIT 1
+            ) s ON true
+            WHERE c.project_id = :projectId AND v.status = 'active'
+            ORDER BY s.session_date ASC, v.order_index ASC
             """, nativeQuery = true)
     List<VideoFocusProjection> findProjectVideosForFocus(@Param("projectId") String projectId,
             @Param("accessId") String accessId);

@@ -32,7 +32,7 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
             @Param("accessId") String accessId);
 
     @Query(value = """
-            SELECT c.session_date AS sessionDate,
+            SELECT s.session_date AS sessionDate,
                    m.id AS materialId,
                    m.title AS materialTitle,
                    m.order_index AS orderIndex,
@@ -40,8 +40,16 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
                       WHERE mc.student_access_id = :accessId AND mc.material_id = m.id) AS completed
             FROM lms_chapters c
             JOIN lms_materials m ON m.chapter_id = c.id AND m.status = 'active'
+            JOIN LATERAL (
+              SELECT s.session_date
+              FROM lms_chapter_sessions s
+              WHERE s.chapter_id = c.id AND s.status = 'active'
+                AND (s.only_group_id IS NULL OR s.only_group_id = (SELECT a.group_id FROM lms_accesses a WHERE a.id = :accessId))
+              ORDER BY (s.only_group_id IS NULL)
+              LIMIT 1
+            ) s ON true
             WHERE c.level_id = :levelId AND c.status = 'active'
-            ORDER BY c.session_date ASC, m.order_index ASC
+            ORDER BY s.session_date ASC, m.order_index ASC
             """, nativeQuery = true)
     List<LevelMaterialProjection> findLevelMaterials(@Param("levelId") Integer levelId,
             @Param("accessId") String accessId);
@@ -56,8 +64,16 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
             FROM lms_materials m
             JOIN lms_chapters c ON c.id = m.chapter_id AND c.status = 'active'
             JOIN lms_levels lv ON lv.id = c.level_id
-            WHERE lv.project_id = :projectId AND m.status = 'active'
-            ORDER BY c.session_date ASC, m.order_index ASC
+            JOIN LATERAL (
+              SELECT s.session_date
+              FROM lms_chapter_sessions s
+              WHERE s.chapter_id = c.id AND s.status = 'active'
+                AND (s.only_group_id IS NULL OR s.only_group_id = (SELECT a.group_id FROM lms_accesses a WHERE a.id = :accessId))
+              ORDER BY (s.only_group_id IS NULL)
+              LIMIT 1
+            ) s ON true
+            WHERE c.project_id = :projectId AND m.status = 'active'
+            ORDER BY s.session_date ASC, m.order_index ASC
             """, nativeQuery = true)
     List<MaterialFocusProjection> findProjectMaterialsForFocus(@Param("projectId") String projectId,
             @Param("accessId") String accessId);

@@ -108,7 +108,7 @@ public class PromptService {
                 .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
         Level level = levelRepository.findById(prompt.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, prompt.getOnlyProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
 
         List<CategorySummary> categories = promptRepository.findCategoriesForPrompts(List.of(prompt.getId())).stream()
@@ -151,6 +151,7 @@ public class PromptService {
 
         Prompt prompt = new Prompt();
         prompt.setLevelId(level.getId());
+        prompt.setOnlyProjectId(request.projectId());
         prompt.setName(request.name());
         prompt.setScenario(request.scenario());
         prompt.setExpectedOutput(SELF_PRACTICE_PLACEHOLDER);
@@ -182,7 +183,7 @@ public class PromptService {
         Level level = levelRepository.findById(prompt.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
 
-        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, level.getProjectId())
+        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, prompt.getOnlyProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
         if (summary.getGroupId() == null) {
             throw new BadRequestException(
@@ -200,7 +201,7 @@ public class PromptService {
 
         if (submission.getAssignedByAccessId() == null) {
             String championAccessId = accessRepository
-                    .findChampionAccessId(level.getProjectId(), summary.getGroupId())
+                    .findChampionAccessId(prompt.getOnlyProjectId(), summary.getGroupId())
                     .orElseThrow(() -> new ResourceNotFoundException("No champion found for this group"));
             submission.setAssignedByAccessId(championAccessId);
             promptSubmissionRepository.save(submission);
@@ -215,7 +216,7 @@ public class PromptService {
                 .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
         Level level = levelRepository.findById(prompt.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, prompt.getOnlyProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
 
         PromptSubmission submission = promptSubmissionRepository

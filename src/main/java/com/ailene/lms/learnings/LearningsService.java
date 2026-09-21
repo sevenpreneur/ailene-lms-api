@@ -83,7 +83,7 @@ public class LearningsService {
     public List<LevelDto> getLevels(String jwt, LevelListRequest request) {
         authService.resolveUserId(jwt);
 
-        return levelRepository.findByProjectIdAndStatusOrderByLevelNumberAsc(request.projectId(), Status.active)
+        return levelRepository.findByStatusOrderByLevelNumberAsc(Status.active)
                 .stream()
                 .map(LevelDto::from)
                 .toList();
@@ -226,7 +226,7 @@ public class LearningsService {
     private AccessContext resolveAccess(UUID userId, Chapter chapter) {
         Level level = levelRepository.findById(chapter.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
         return new AccessContext(access, level);
     }

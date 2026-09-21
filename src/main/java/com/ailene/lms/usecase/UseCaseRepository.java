@@ -16,7 +16,7 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
                    lv.level_number AS levelNumber
             FROM lms_use_cases u
             JOIN lms_levels lv ON lv.id = u.level_id
-            WHERE lv.project_id = :projectId
+            WHERE (u.only_project_id IS NULL OR u.only_project_id = :projectId)
               AND u.status = 'active'
               AND u.is_self_created = false
               AND u.name ILIKE '%' || :search || '%'
@@ -30,7 +30,7 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             SELECT COUNT(*)
             FROM lms_use_cases u
             JOIN lms_levels lv ON lv.id = u.level_id
-            WHERE lv.project_id = :projectId
+            WHERE (u.only_project_id IS NULL OR u.only_project_id = :projectId)
               AND u.status = 'active'
               AND u.is_self_created = false
               AND u.name ILIKE '%' || :search || '%'
@@ -79,7 +79,7 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             JOIN lms_levels lv ON lv.id = u.level_id
             LEFT JOIN lms_accesses aa ON aa.id = us.assigned_by_access_id
             LEFT JOIN lms_users au ON au.id = aa.user_id
-            WHERE lv.project_id = :projectId
+            WHERE (u.only_project_id IS NULL OR u.only_project_id = :projectId)
               AND us.student_access_id = :accessId
               AND us.assigned_by_access_id IS NOT NULL
               AND (:hasSubmitted IS NULL OR (us.submitted_at IS NOT NULL) = :hasSubmitted)
@@ -95,7 +95,7 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             FROM lms_use_case_submissions us
             JOIN lms_use_cases u ON u.id = us.use_case_id
             JOIN lms_levels lv ON lv.id = u.level_id
-            WHERE lv.project_id = :projectId AND us.student_access_id = :accessId AND us.is_accepted = true
+            WHERE (u.only_project_id IS NULL OR u.only_project_id = :projectId) AND us.student_access_id = :accessId AND us.is_accepted = true
             """, nativeQuery = true)
     List<UseCaseAchievementProjection> findApprovedAchievements(@Param("projectId") String projectId,
             @Param("accessId") String accessId);
@@ -110,7 +110,7 @@ public interface UseCaseRepository extends JpaRepository<UseCase, Integer> {
             FROM lms_use_case_submissions us
             JOIN lms_use_cases u ON u.id = us.use_case_id
             JOIN lms_levels lv ON lv.id = u.level_id
-            WHERE lv.project_id = :projectId AND us.student_access_id = :accessId AND us.submitted_at IS NOT NULL
+            WHERE (u.only_project_id IS NULL OR u.only_project_id = :projectId) AND us.student_access_id = :accessId AND us.submitted_at IS NOT NULL
             """, nativeQuery = true)
     List<UseCaseCompetencyProjection> findCompetencySubmissions(@Param("projectId") String projectId,
             @Param("accessId") String accessId);

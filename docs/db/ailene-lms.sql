@@ -16,14 +16,6 @@ CREATE TYPE lms_chapter_method_enum AS ENUM (
   'offline'
 );
 
--- Enumeration for the lms_chapter_trainer_requests table
-
-CREATE TYPE lms_chapter_trainer_request_status_enum AS ENUM (
-  'pending',
-  'selected',
-  'rejected'
-);
-
 -- Enumeration for the lms_accesses table
 
 CREATE TYPE lms_access_role_enum AS ENUM (
@@ -131,60 +123,101 @@ CREATE TYPE lms_pa_motivation_enum AS ENUM (
 -- Tables --
 ------------
 
--- Program Structure
---
--- trainers is owned by a separate app (not the LMS flow) and referenced but not defined in this file.
+CREATE TABLE lms_users (
+  id              UUID         PRIMARY KEY,
+  full_name       VARCHAR      NOT NULL,
+  email           VARCHAR      NOT NULL  UNIQUE,
+  avatar          VARCHAR          NULL,
+  job_title       VARCHAR      NOT NULL,
+  last_active_at  TIMESTAMPTZ      NULL,
+  created_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_tokens (
+  id           SERIAL       PRIMARY KEY,
+  user_id      UUID         NOT NULL,
+  token        TEXT         NOT NULL  UNIQUE,
+  is_active    BOOLEAN      NOT NULL  DEFAULT FALSE,
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE lms_projects (
   id                 CHAR(21)     PRIMARY KEY,
   name               VARCHAR      NOT NULL,
-  created_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   attendee_pax       INTEGER          NULL,
   company_name       VARCHAR          NULL,
   company_image_url  VARCHAR          NULL,
-  company_slug       VARCHAR          NULL
+  company_slug       VARCHAR          NULL,
+  created_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
+
+-- A global lookup shared by every project; level_number is the key the application reads by.
 
 CREATE TABLE lms_levels (
   id            SERIAL       PRIMARY KEY,
-  project_id    CHAR(21)     NOT NULL,
   level_number  SMALLINT     NOT NULL  UNIQUE,
   name          VARCHAR      NOT NULL,
   status        status_enum  NOT NULL  DEFAULT 'active',
   created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_groups (
+  id           SERIAL       PRIMARY KEY,
+  name         VARCHAR      NOT NULL,
+  project_id   CHAR(21)     NOT NULL,
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (id, project_id)
 );
+
+CREATE TABLE lms_accesses (
+  id                 CHAR(21)              PRIMARY KEY,
+  project_id         CHAR(21)              NOT NULL,
+  user_id            UUID                  NOT NULL,
+  group_id           INTEGER                   NULL,
+  current_level_id   INTEGER                   NULL,
+  role               lms_access_role_enum  NOT NULL,
+  created_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (project_id, user_id)
+);
+
+
 
 -- Contents
 
 CREATE TABLE lms_chapters (
-  id                 SERIAL                    PRIMARY KEY,
-  level_id           INTEGER                   NOT NULL,
-  name               VARCHAR                   NOT NULL,
-  description        TEXT                          NULL,
-  session_date       TIMESTAMPTZ               NOT NULL,
-  status             status_enum               NOT NULL  DEFAULT 'active',
-  created_at         TIMESTAMPTZ               NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at         TIMESTAMPTZ               NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  trainer_id         CHAR(21)                      NULL,
-  duration_minutes   INTEGER                   NOT NULL,
-  location_name      VARCHAR                   NOT NULL,
-  location_url       VARCHAR                   NOT NULL,
-  method             lms_chapter_method_enum   NOT NULL  DEFAULT 'offline'
+  id           SERIAL       PRIMARY KEY,
+  level_id     INTEGER      NOT NULL,
+  project_id   CHAR(21)     NOT NULL,
+  name         VARCHAR      NOT NULL,
+  description  TEXT             NULL,
+  status       status_enum  NOT NULL  DEFAULT 'active',
+  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (id, project_id)
 );
 
-CREATE TABLE lms_chapter_trainer_requests (
-  id           SERIAL                                     PRIMARY KEY,
-  chapter_id   INTEGER                                     NOT NULL,
-  trainer_id   CHAR(21)                                    NOT NULL,
-  status       lms_chapter_trainer_request_status_enum     NOT NULL  DEFAULT 'pending',
-  reviewed_by  UUID                                            NULL,
-  reviewed_at  TIMESTAMPTZ                                     NULL,
-  created_at   TIMESTAMPTZ                                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMPTZ                                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (chapter_id, trainer_id)
+-- One scheduled sitting of a chapter. group_id NULL means every group in the project attends it.
+
+CREATE TABLE lms_chapter_sessions (
+  id                SERIAL                   PRIMARY KEY,
+  chapter_id        INTEGER                  NOT NULL,
+  project_id        CHAR(21)                 NOT NULL,
+  only_group_id     INTEGER                      NULL,
+  session_date      TIMESTAMPTZ              NOT NULL,
+  duration_minutes  INTEGER                  NOT NULL,
+  location_name     VARCHAR                  NOT NULL,
+  location_url      VARCHAR                  NOT NULL,
+  method            lms_chapter_method_enum  NOT NULL  DEFAULT 'offline',
+  trainer_id        CHAR(21)                     NULL,
+  status            status_enum              NOT NULL  DEFAULT 'active',
+  created_at        TIMESTAMPTZ              NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ              NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (chapter_id, only_group_id)
 );
 
 CREATE TABLE lms_materials (
@@ -254,9 +287,12 @@ CREATE TABLE lms_categories (
 
 -- Practical Learning
 
+-- only_project_id NULL means shared by every project -- the library's only tenant boundary since lms_levels became a lookup.
+
 CREATE TABLE lms_prompts (
   id               SERIAL       PRIMARY KEY,
   level_id         INTEGER      NOT NULL,
+  only_project_id  CHAR(21)         NULL,
   name             VARCHAR      NOT NULL,
   scenario         TEXT         NOT NULL,
   expected_output  TEXT         NOT NULL,
@@ -276,6 +312,7 @@ CREATE TABLE lms_prompt_categories (
 CREATE TABLE lms_use_cases (
   id               SERIAL       PRIMARY KEY,
   level_id         INTEGER      NOT NULL,
+  only_project_id  CHAR(21)         NULL,
   name             VARCHAR      NOT NULL,
   description      TEXT         NOT NULL,
   xp_reward        SMALLINT     NOT NULL  DEFAULT 70,
@@ -289,48 +326,6 @@ CREATE TABLE lms_use_case_categories (
   use_case_id  INTEGER   NOT NULL,
   category_id  SMALLINT  NOT NULL,
   PRIMARY KEY (use_case_id, category_id)
-);
-
--- Users
-
-CREATE TABLE lms_users (
-  id              UUID         PRIMARY KEY,
-  full_name       VARCHAR      NOT NULL,
-  email           VARCHAR      NOT NULL  UNIQUE,
-  avatar          VARCHAR          NULL,
-  job_title       VARCHAR      NOT NULL,
-  last_active_at  TIMESTAMPTZ      NULL,
-  created_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE lms_tokens (
-  id           SERIAL       PRIMARY KEY,
-  user_id      UUID         NOT NULL,
-  token        TEXT         NOT NULL  UNIQUE,
-  is_active    BOOLEAN      NOT NULL  DEFAULT FALSE,
-  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE lms_groups (
-  id           SERIAL       PRIMARY KEY,
-  name         VARCHAR      NOT NULL,
-  project_id   CHAR(21)     NOT NULL,
-  created_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (id, project_id)
-);
-
-CREATE TABLE lms_accesses (
-  id                 CHAR(21)              PRIMARY KEY,
-  project_id         CHAR(21)              NOT NULL,
-  user_id            UUID                  NOT NULL,
-  group_id           INTEGER                   NULL,
-  current_level_id   INTEGER                   NULL,
-  role               lms_access_role_enum  NOT NULL,
-  created_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (project_id, user_id)
 );
 
 -- Submissions & Progress
@@ -492,17 +487,14 @@ CREATE TABLE lms_announcement (
 
 -- LMS program structure
 
-ALTER TABLE lms_levels
-  ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
-
 ALTER TABLE lms_chapters
   ADD FOREIGN KEY (level_id)   REFERENCES lms_levels (id),
-  ADD FOREIGN KEY (trainer_id) REFERENCES trainers (id);
+  ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
 
-ALTER TABLE lms_chapter_trainer_requests
-  ADD FOREIGN KEY (chapter_id)  REFERENCES lms_chapters (id),
-  ADD FOREIGN KEY (trainer_id)  REFERENCES trainers (id),
-  ADD FOREIGN KEY (reviewed_by) REFERENCES users (id);
+ALTER TABLE lms_chapter_sessions
+  ADD FOREIGN KEY (chapter_id, project_id)    REFERENCES lms_chapters (id, project_id),
+  ADD FOREIGN KEY (only_group_id, project_id) REFERENCES lms_groups (id, project_id),
+  ADD FOREIGN KEY (trainer_id)                REFERENCES trainers (id);
 
 -- LMS content
 
@@ -524,14 +516,16 @@ ALTER TABLE lms_quiz_options
 -- LMS categories, prompts & use cases
 
 ALTER TABLE lms_prompts
-  ADD FOREIGN KEY (level_id) REFERENCES lms_levels (id);
+  ADD FOREIGN KEY (level_id)        REFERENCES lms_levels (id),
+  ADD FOREIGN KEY (only_project_id) REFERENCES lms_projects (id);
 
 ALTER TABLE lms_prompt_categories
   ADD FOREIGN KEY (prompt_id)   REFERENCES lms_prompts (id),
   ADD FOREIGN KEY (category_id) REFERENCES lms_categories (id);
 
 ALTER TABLE lms_use_cases
-  ADD FOREIGN KEY (level_id) REFERENCES lms_levels (id);
+  ADD FOREIGN KEY (level_id)        REFERENCES lms_levels (id),
+  ADD FOREIGN KEY (only_project_id) REFERENCES lms_projects (id);
 
 ALTER TABLE lms_use_case_categories
   ADD FOREIGN KEY (use_case_id) REFERENCES lms_use_cases (id),
@@ -549,7 +543,7 @@ ALTER TABLE lms_accesses
   ADD FOREIGN KEY (project_id)                   REFERENCES lms_projects (id),
   ADD FOREIGN KEY (user_id)                      REFERENCES lms_users (id),
   ADD FOREIGN KEY (group_id, project_id)         REFERENCES lms_groups (id, project_id),
-  ADD FOREIGN KEY (current_level_id, project_id) REFERENCES lms_levels (id, project_id);
+  ADD FOREIGN KEY (current_level_id)             REFERENCES lms_levels (id);
 
 ALTER TABLE lms_level_history
   ADD FOREIGN KEY (access_id) REFERENCES lms_accesses (id),
@@ -605,11 +599,15 @@ ALTER TABLE lms_announcement
 
 -- LMS program structure
 
-CREATE INDEX idx_lms_levels_project_id               ON lms_levels (project_id);
 CREATE INDEX idx_lms_chapters_level_id               ON lms_chapters (level_id);
-CREATE INDEX idx_lms_chapters_trainer_id             ON lms_chapters (trainer_id);
-CREATE INDEX idx_lms_ctr_trainer_id                  ON lms_chapter_trainer_requests (trainer_id);
-CREATE INDEX idx_lms_ctr_reviewed_by                 ON lms_chapter_trainer_requests (reviewed_by);
+CREATE INDEX idx_lms_chapters_project_id             ON lms_chapters (project_id);
+CREATE INDEX idx_lms_chapter_sessions_chapter_id     ON lms_chapter_sessions (chapter_id);
+CREATE INDEX idx_lms_chapter_sessions_only_group_id  ON lms_chapter_sessions (only_group_id);
+CREATE INDEX idx_lms_chapter_sessions_trainer_id     ON lms_chapter_sessions (trainer_id);
+
+-- UNIQUE (chapter_id, only_group_id) does not constrain repeated NULLs, so cap the all-groups session here.
+CREATE UNIQUE INDEX idx_lms_chapter_sessions_all_groups
+  ON lms_chapter_sessions (chapter_id) WHERE only_group_id IS NULL;
 
 -- LMS content
 
@@ -621,6 +619,8 @@ CREATE INDEX idx_lms_quiz_options_question_id        ON lms_quiz_options (questi
 
 -- LMS categories, prompts & use cases
 
+CREATE INDEX idx_lms_prompts_only_project_id         ON lms_prompts (only_project_id);
+CREATE INDEX idx_lms_use_cases_only_project_id       ON lms_use_cases (only_project_id);
 CREATE INDEX idx_lms_prompts_level_id                ON lms_prompts (level_id);
 CREATE INDEX idx_lms_prompt_categories_category_id   ON lms_prompt_categories (category_id);
 CREATE INDEX idx_lms_use_cases_level_id              ON lms_use_cases (level_id);
@@ -679,8 +679,8 @@ CREATE TRIGGER update_lms_chapters_updated_at_trigger
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
-CREATE TRIGGER update_lms_chapter_trainer_requests_updated_at_trigger
-  BEFORE UPDATE ON lms_chapter_trainer_requests
+CREATE TRIGGER update_lms_chapter_sessions_updated_at_trigger
+  BEFORE UPDATE ON lms_chapter_sessions
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 

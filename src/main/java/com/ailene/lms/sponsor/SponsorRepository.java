@@ -28,7 +28,7 @@ public interface SponsorRepository extends JpaRepository<Access, String> {
             FROM lms_accesses a
             JOIN lms_users u ON u.id = a.user_id
             LEFT JOIN lms_groups g ON g.id = a.group_id AND g.project_id = a.project_id
-            LEFT JOIN lms_levels lv ON lv.id = a.current_level_id AND lv.project_id = a.project_id
+            LEFT JOIN lms_levels lv ON lv.id = a.current_level_id
             WHERE a.project_id = :projectId
             ORDER BY a.created_at ASC, a.id ASC
             """, nativeQuery = true)
@@ -90,10 +90,10 @@ public interface SponsorRepository extends JpaRepository<Access, String> {
     @Query(value = """
             SELECT lv.id AS id, lv.level_number AS levelNumber, lv.name AS name
             FROM lms_levels lv
-            WHERE lv.project_id = :projectId AND lv.status = 'active'
+            WHERE lv.status = 'active'
             ORDER BY lv.level_number ASC
             """, nativeQuery = true)
-    List<LevelRowProjection> findActiveLevels(@Param("projectId") String projectId);
+    List<LevelRowProjection> findActiveLevels();
 
     @Query(value = """
             SELECT g.id AS id, g.name AS name
@@ -119,15 +119,15 @@ public interface SponsorRepository extends JpaRepository<Access, String> {
               (SELECT COUNT(*) FROM lms_materials m
                  JOIN lms_chapters c ON c.id = m.chapter_id
                  JOIN lms_levels lv ON lv.id = c.level_id
-                 WHERE lv.project_id = :projectId AND c.status = 'active' AND m.status = 'active') +
+                 WHERE c.project_id = :projectId AND c.status = 'active' AND m.status = 'active') +
               (SELECT COUNT(*) FROM lms_videos v
                  JOIN lms_chapters c ON c.id = v.chapter_id
                  JOIN lms_levels lv ON lv.id = c.level_id
-                 WHERE lv.project_id = :projectId AND c.status = 'active' AND v.status = 'active') +
+                 WHERE c.project_id = :projectId AND c.status = 'active' AND v.status = 'active') +
               (SELECT COUNT(*) FROM lms_quizzes q
                  JOIN lms_chapters c ON c.id = q.chapter_id
                  JOIN lms_levels lv ON lv.id = c.level_id
-                 WHERE lv.project_id = :projectId AND c.status = 'active' AND q.status = 'active')
+                 WHERE c.project_id = :projectId AND c.status = 'active' AND q.status = 'active')
             )
             """, nativeQuery = true)
     long countLearningTasks(@Param("projectId") String projectId);

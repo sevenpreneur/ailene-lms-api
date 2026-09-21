@@ -111,7 +111,7 @@ public class PreAssessmentService {
                     .orElseThrow(() -> new ResourceNotFoundException("Pre-assessment not found"));
             Access access = accessRepository.findById(preAssessment.getAccessId())
                     .orElseThrow(() -> new ResourceNotFoundException("Access not found"));
-            List<String> lessons = chapterRepository.findActiveChapterNames(access.getProjectId());
+            List<String> lessons = chapterRepository.findActiveChapterNames(access.getProjectId(), access.getId());
 
             var recommendations = recommendationGenerator.generate(preAssessment, lessons);
 

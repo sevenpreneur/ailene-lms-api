@@ -26,9 +26,6 @@ public class Level {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "project_id", nullable = false, length = 21)
-    private String projectId;
 
     @Column(name = "level_number", nullable = false, unique = true)
     private Short levelNumber;

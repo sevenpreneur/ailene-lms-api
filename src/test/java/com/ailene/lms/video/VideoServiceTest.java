@@ -63,12 +63,13 @@ class VideoServiceTest {
 
         Level level = new Level();
         level.setId(1);
-        level.setProjectId("proj-1");
+        chapter.setProjectId("proj-1");
         level.setLevelNumber((short) 0);
         when(levelRepository.findById(1)).thenReturn(Optional.of(level));
 
         Access access = new Access();
         access.setId("access-1");
+        access.setProjectId("proj-1");
         when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
         when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
 
@@ -97,12 +98,13 @@ class VideoServiceTest {
 
         Level level = new Level();
         level.setId(2);
-        level.setProjectId("proj-1");
+        chapter.setProjectId("proj-1");
         level.setLevelNumber((short) 2);
         when(levelRepository.findById(2)).thenReturn(Optional.of(level));
 
         Access access = new Access();
         access.setId("access-1");
+        access.setProjectId("proj-1");
         when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
 
         StudentStatusProjection status = mock(StudentStatusProjection.class);
@@ -134,12 +136,13 @@ class VideoServiceTest {
 
         Level level = new Level();
         level.setId(1);
-        level.setProjectId("proj-1");
+        chapter.setProjectId("proj-1");
         level.setLevelNumber((short) 0);
         when(levelRepository.findById(1)).thenReturn(Optional.of(level));
 
         Access access = new Access();
         access.setId("access-1");
+        access.setProjectId("proj-1");
         when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
         when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
 
@@ -176,12 +179,13 @@ class VideoServiceTest {
 
         Level level = new Level();
         level.setId(1);
-        level.setProjectId("proj-1");
+        chapter.setProjectId("proj-1");
         level.setLevelNumber((short) 0);
         when(levelRepository.findById(1)).thenReturn(Optional.of(level));
 
         Access access = new Access();
         access.setId("access-1");
+        access.setProjectId("proj-1");
         when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
         when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
 

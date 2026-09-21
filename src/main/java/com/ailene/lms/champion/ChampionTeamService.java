@@ -44,7 +44,7 @@ public class ChampionTeamService {
         }
 
         List<String> accessIds = members.stream().map(TeamMemberProjection::getAccessId).toList();
-        long totalTasks = championRepository.countLearningTasks(request.projectId());
+        long totalTasks = championRepository.countLearningTasks(request.projectId(), groupId);
 
         Map<String, Long> tasksDone = new HashMap<>();
         for (AccessCountProjection row : championRepository.findTasksDone(accessIds)) {

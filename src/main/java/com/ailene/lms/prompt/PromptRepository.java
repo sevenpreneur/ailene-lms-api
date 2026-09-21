@@ -16,7 +16,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
                    lv.level_number AS levelNumber
             FROM lms_prompts p
             JOIN lms_levels lv ON lv.id = p.level_id
-            WHERE lv.project_id = :projectId
+            WHERE (p.only_project_id IS NULL OR p.only_project_id = :projectId)
               AND p.status = 'active'
               AND p.is_self_created = false
               AND p.name ILIKE '%' || :search || '%'
@@ -30,7 +30,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             SELECT COUNT(*)
             FROM lms_prompts p
             JOIN lms_levels lv ON lv.id = p.level_id
-            WHERE lv.project_id = :projectId
+            WHERE (p.only_project_id IS NULL OR p.only_project_id = :projectId)
               AND p.status = 'active'
               AND p.is_self_created = false
               AND p.name ILIKE '%' || :search || '%'
@@ -79,7 +79,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             JOIN lms_levels lv ON lv.id = p.level_id
             LEFT JOIN lms_accesses aa ON aa.id = ps.assigned_by_access_id
             LEFT JOIN lms_users au ON au.id = aa.user_id
-            WHERE lv.project_id = :projectId
+            WHERE (p.only_project_id IS NULL OR p.only_project_id = :projectId)
               AND ps.student_access_id = :accessId
               AND ps.assigned_by_access_id IS NOT NULL
               AND (:hasSubmitted IS NULL OR (ps.submitted_at IS NOT NULL) = :hasSubmitted)
@@ -95,7 +95,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             FROM lms_prompt_submissions ps
             JOIN lms_prompts p ON p.id = ps.prompt_id
             JOIN lms_levels lv ON lv.id = p.level_id
-            WHERE lv.project_id = :projectId AND ps.student_access_id = :accessId AND ps.is_accepted = true
+            WHERE (p.only_project_id IS NULL OR p.only_project_id = :projectId) AND ps.student_access_id = :accessId AND ps.is_accepted = true
             """, nativeQuery = true)
     long countApprovedSubmissions(@Param("projectId") String projectId, @Param("accessId") String accessId);
 
@@ -109,7 +109,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
             FROM lms_prompt_submissions ps
             JOIN lms_prompts p ON p.id = ps.prompt_id
             JOIN lms_levels lv ON lv.id = p.level_id
-            WHERE lv.project_id = :projectId AND ps.student_access_id = :accessId AND ps.submitted_at IS NOT NULL
+            WHERE (p.only_project_id IS NULL OR p.only_project_id = :projectId) AND ps.student_access_id = :accessId AND ps.submitted_at IS NOT NULL
             """, nativeQuery = true)
     List<PromptCompetencyProjection> findCompetencySubmissions(@Param("projectId") String projectId,
             @Param("accessId") String accessId);

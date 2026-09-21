@@ -107,7 +107,7 @@ public class UseCaseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
         Level level = levelRepository.findById(useCase.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, useCase.getOnlyProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
 
         List<CategorySummary> categories = useCaseRepository.findCategoriesForUseCases(List.of(useCase.getId()))
@@ -150,6 +150,7 @@ public class UseCaseService {
 
         UseCase useCase = new UseCase();
         useCase.setLevelId(level.getId());
+        useCase.setOnlyProjectId(request.projectId());
         useCase.setName(request.name());
         useCase.setDescription(request.description());
         useCase.setStatus(Status.active);
@@ -185,7 +186,7 @@ public class UseCaseService {
         Level level = levelRepository.findById(useCase.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
 
-        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, level.getProjectId())
+        GroupSummaryProjection summary = accessRepository.findGroupSummary(userId, useCase.getOnlyProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
         if (summary.getGroupId() == null) {
             throw new BadRequestException(
@@ -203,7 +204,7 @@ public class UseCaseService {
 
         if (submission.getAssignedByAccessId() == null) {
             String championAccessId = accessRepository
-                    .findChampionAccessId(level.getProjectId(), summary.getGroupId())
+                    .findChampionAccessId(useCase.getOnlyProjectId(), summary.getGroupId())
                     .orElseThrow(() -> new ResourceNotFoundException("No champion found for this group"));
             submission.setAssignedByAccessId(championAccessId);
             useCaseSubmissionRepository.save(submission);
@@ -218,7 +219,7 @@ public class UseCaseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
         Level level = levelRepository.findById(useCase.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, useCase.getOnlyProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
 
         UseCaseSubmission submission = useCaseSubmissionRepository

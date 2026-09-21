@@ -62,12 +62,13 @@ class QuizServiceTest {
 
         Level level = new Level();
         level.setId(levelId);
-        level.setProjectId("proj-1");
+        chapter.setProjectId("proj-1");
         level.setLevelNumber(levelNumber);
         when(levelRepository.findById(levelId)).thenReturn(Optional.of(level));
 
         Access access = new Access();
         access.setId("access-1");
+        access.setProjectId("proj-1");
         when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
 
         // saveDraft() never calls requireLevelUnlocked(), so this stub is unused by that test - lenient to allow both.

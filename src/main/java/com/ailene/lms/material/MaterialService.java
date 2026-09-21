@@ -38,7 +38,7 @@ public class MaterialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
         Chapter chapter = resolveChapter(material.getChapterId());
         AccessContext ctx = resolveAccess(userId, chapter);
-        requireLevelUnlocked(userId, ctx.level());
+        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
         Access access = ctx.access();
 
         var completion = materialRepository.findCompletion(material.getId(), access.getId());
@@ -59,7 +59,7 @@ public class MaterialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
         Chapter chapter = resolveChapter(material.getChapterId());
         AccessContext ctx = resolveAccess(userId, chapter);
-        requireLevelUnlocked(userId, ctx.level());
+        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
         Access access = ctx.access();
 
         materialRepository.insertCompletion(material.getId(), access.getId());
@@ -83,7 +83,7 @@ public class MaterialService {
         Access access = ctx.access();
         Level level = ctx.level();
 
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, level.getProjectId())
+        StudentStatusProjection status = accessRepository.findStudentStatus(userId, access.getProjectId())
                 .orElse(null);
         short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
                 : status.getCurrentLevelNumber();
@@ -111,13 +111,13 @@ public class MaterialService {
     private AccessContext resolveAccess(UUID userId, Chapter chapter) {
         Level level = levelRepository.findById(chapter.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, level.getProjectId())
+        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
         return new AccessContext(access, level);
     }
 
-    private void requireLevelUnlocked(UUID userId, Level level) {
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, level.getProjectId())
+    private void requireLevelUnlocked(UUID userId, String projectId, Level level) {
+        StudentStatusProjection status = accessRepository.findStudentStatus(userId, projectId)
                 .orElse(null);
         short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
                 : status.getCurrentLevelNumber();

@@ -29,6 +29,11 @@ public class UseCase {
     @Column(name = "level_id", nullable = false)
     private Integer levelId;
 
+    // null means the row belongs to the shared library rather than one project
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "only_project_id", length = 21)
+    private String onlyProjectId;
+
     @Column(nullable = false)
     private String name;
 

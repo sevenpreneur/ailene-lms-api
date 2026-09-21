@@ -69,8 +69,16 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             FROM lms_quizzes q
             JOIN lms_chapters c ON c.id = q.chapter_id AND c.status = 'active'
             JOIN lms_levels lv ON lv.id = c.level_id
-            WHERE lv.project_id = :projectId AND q.status = 'active'
-            ORDER BY c.session_date ASC, q.order_index ASC
+            JOIN LATERAL (
+              SELECT s.session_date
+              FROM lms_chapter_sessions s
+              WHERE s.chapter_id = c.id AND s.status = 'active'
+                AND (s.only_group_id IS NULL OR s.only_group_id = (SELECT a.group_id FROM lms_accesses a WHERE a.id = :accessId))
+              ORDER BY (s.only_group_id IS NULL)
+              LIMIT 1
+            ) s ON true
+            WHERE c.project_id = :projectId AND q.status = 'active'
+            ORDER BY s.session_date ASC, q.order_index ASC
             """, nativeQuery = true)
     List<QuizFocusProjection> findProjectQuizzesForFocus(@Param("projectId") String projectId,
             @Param("accessId") String accessId);
@@ -119,7 +127,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
               JOIN lms_quizzes q ON q.id = qs.quiz_id
               JOIN lms_chapters c ON c.id = q.chapter_id
               JOIN lms_levels lv ON lv.id = c.level_id
-              WHERE lv.project_id = :projectId AND qs.student_access_id = :accessId AND qs.is_completed = true
+              WHERE c.project_id = :projectId AND qs.student_access_id = :accessId AND qs.is_completed = true
               GROUP BY qs.quiz_id
             ) t
             """, nativeQuery = true)

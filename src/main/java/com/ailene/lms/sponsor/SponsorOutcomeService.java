@@ -59,7 +59,7 @@ public class SponsorOutcomeService {
         }
 
         short maxLevelNumber = 0;
-        for (LevelRowProjection level : sponsorRepository.findActiveLevels(projectId)) {
+        for (LevelRowProjection level : sponsorRepository.findActiveLevels()) {
             if (level.getLevelNumber() != null && level.getLevelNumber() > maxLevelNumber) {
                 maxLevelNumber = level.getLevelNumber();
             }
@@ -80,7 +80,7 @@ public class SponsorOutcomeService {
             countByLevel.merge(levelNumber(member), 1, Integer::sum);
         }
 
-        List<OutcomeLevelItem> distribution = sponsorRepository.findActiveLevels(projectId).stream()
+        List<OutcomeLevelItem> distribution = sponsorRepository.findActiveLevels().stream()
                 .map(level -> {
                     int count = countByLevel.getOrDefault(level.getLevelNumber(), 0);
                     return new OutcomeLevelItem(level.getLevelNumber(), "L" + level.getLevelNumber(),
@@ -202,7 +202,7 @@ public class SponsorOutcomeService {
         }
 
         short maxLevelNumber = 1;
-        for (LevelRowProjection level : sponsorRepository.findActiveLevels(projectId)) {
+        for (LevelRowProjection level : sponsorRepository.findActiveLevels()) {
             if (level.getLevelNumber() != null && level.getLevelNumber() > maxLevelNumber) {
                 maxLevelNumber = level.getLevelNumber();
             }
