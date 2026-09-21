@@ -25,7 +25,7 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 | `role` | `Role` entity + `/api/v1/roles` endpoints (`RoleController`, `RoleDto`, `RoleRepository`) |
 | `user` | `User` entity + `UserDto`/`UserRepository` — the LMS's own user profile, no endpoints of its own yet (consumed by `auth`) |
 | `auth` | Google login, session check, and logout (`AuthController`, `AuthService`, `GoogleTokenVerifier`, `GoogleUserInfo`, `JwtService`, `GoogleLoginRequest`, `AuthLoginResponse`, `CheckSessionResponse`) and its `Token`/`TokenRepository` |
-| `access` | `Access` entity (`lms_accesses` — a user's role on a project: champion/student/sponsor) + `AccessRepository`, whose native query joins `lms_projects` and the external `b2b_company` table to build `ProjectAccessDto` for `auth.CheckSessionResponse` |
+| `access` | `Access` entity (`lms_accesses` — a user's role on a project: champion/student/sponsor) + `AccessRepository`, whose native query joins `lms_projects` (whose `company_name`/`company_slug`/`company_image_url` columns are denormalised, not FKs into the CRM module) to build `ProjectAccessDto` for `auth.CheckSessionResponse` |
 | `hello` | `HelloController` — `POST /api/v1/hello-world`, a `SECRET_KEY`-gated smoke-test endpoint with no other purpose |
 | `material` | `Material` entity + `/api/v1/materials/*` endpoints (`MaterialController`, `MaterialService`) — reading one material's full detail, marking it complete, and listing every material in the same level (`in-level`); listing materials per chapter lives in `learnings` |
 | `video` | `Video` entity + `/api/v1/videos/*` endpoints (`VideoController`, `VideoService`) — reading one video's full detail and marking it complete; listing lives in `learnings` |
@@ -66,7 +66,7 @@ Package-by-feature under `com.ailene.lms.<feature>`: each feature owns its own `
 
 **There is no real migration history yet.** `spring.jpa.hibernate.ddl-auto` is `validate` (Hibernate never auto-migrates), Flyway is configured but `src/main/resources/db/migration` is empty, and the live schema was hand-authored directly against Neon (via the Neon MCP tools) and documented after the fact in `docs/db/ailene-lms.sql`. Until real Flyway migrations exist, any schema change must be made in **both** places by hand — the DDL doc and the live Neon project — and they must never drift. Since `ddl-auto` is `validate`, `./mvnw test -Dtest=LmsApplicationTests` (with a real `.env` in place) is a fast way to catch an entity/schema mismatch without writing any data.
 
-The Indexes section at the bottom of `ailene-lms.sql` is the one deliberate exception to that no-drift rule: its 33 foreign-key indexes are **not applied to Neon yet**. Postgres does not index FK columns on its own, and every other index on a `lms_*` table is a primary key or a `UNIQUE` constraint — so any child-side lookup (`lms_coaching_notes.student_access_id`, `lms_chapters.level_id`, `lms_tokens.user_id`, …) is a seq scan today. Run that section, then delete this paragraph.
+The Indexes section at the bottom of `ailene-lms.sql` is the one deliberate exception to that no-drift rule: its 31 foreign-key indexes are **not applied to Neon yet**. Postgres does not index FK columns on its own, and every other index on a `lms_*` table is a primary key or a `UNIQUE` constraint — so any child-side lookup (`lms_coaching_notes.student_access_id`, `lms_chapters.level_id`, `lms_tokens.user_id`, …) is a seq scan today. Run that section, then delete this paragraph.
 
 ## Known gaps
 

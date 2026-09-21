@@ -5,6 +5,10 @@ public interface ProjectAccessProjection {
 
     String getName();
 
+    String getCompanyName();
+
+    String getCompanySlug();
+
     String getAvatar();
 
     Integer getGroupId();

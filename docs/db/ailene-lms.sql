@@ -136,13 +136,14 @@ CREATE TYPE lms_pa_motivation_enum AS ENUM (
 -- trainers is owned by a separate app (not the LMS flow) and referenced but not defined in this file.
 
 CREATE TABLE lms_projects (
-  id             CHAR(21)     PRIMARY KEY,
-  name           VARCHAR      NOT NULL,
-  company_id     INTEGER          NULL,
-  created_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  attendee_pax   INTEGER          NULL,
-  pipeline_id    INTEGER      NOT NULL
+  id                 CHAR(21)     PRIMARY KEY,
+  name               VARCHAR      NOT NULL,
+  created_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  attendee_pax       INTEGER          NULL,
+  company_name       VARCHAR          NULL,
+  company_image_url  VARCHAR          NULL,
+  company_slug       VARCHAR          NULL
 );
 
 CREATE TABLE lms_levels (
@@ -491,10 +492,6 @@ CREATE TABLE lms_announcement (
 
 -- LMS program structure
 
-ALTER TABLE lms_projects
-  ADD FOREIGN KEY (company_id)  REFERENCES b2b_company (id),
-  ADD FOREIGN KEY (pipeline_id) REFERENCES b2b_pipeline (id);
-
 ALTER TABLE lms_levels
   ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
 
@@ -608,8 +605,6 @@ ALTER TABLE lms_announcement
 
 -- LMS program structure
 
-CREATE INDEX idx_lms_projects_company_id             ON lms_projects (company_id);
-CREATE INDEX idx_lms_projects_pipeline_id            ON lms_projects (pipeline_id);
 CREATE INDEX idx_lms_levels_project_id               ON lms_levels (project_id);
 CREATE INDEX idx_lms_chapters_level_id               ON lms_chapters (level_id);
 CREATE INDEX idx_lms_chapters_trainer_id             ON lms_chapters (trainer_id);

@@ -16,14 +16,15 @@ public interface AccessRepository extends JpaRepository<Access, String> {
     @Query(value = """
             SELECT p.id AS id,
                    p.name AS name,
-                   c.image_url AS avatar,
+                   p.company_name AS companyName,
+                   p.company_slug AS companySlug,
+                   p.company_image_url AS avatar,
                    g.id AS groupId,
                    g.name AS groupName,
                    a.role AS role,
                    EXISTS (SELECT 1 FROM lms_pre_assessments pa WHERE pa.access_id = a.id) AS hasPreAssessment
             FROM lms_accesses a
             JOIN lms_projects p ON p.id = a.project_id
-            LEFT JOIN b2b_company c ON c.id = p.company_id
             LEFT JOIN lms_groups g ON g.id = a.group_id AND g.project_id = a.project_id
             WHERE a.user_id = :userId
             """, nativeQuery = true)
