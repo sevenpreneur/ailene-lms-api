@@ -85,6 +85,9 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
 | 400 | `BAD_REQUEST` | `aiUseFrequency: must not be null` | missing `ai_use_frequency` field (same pattern for every other required field — Java property name + `must not be null`/`must not be blank`/`must not be empty`) |
+| 400 | `BAD_REQUEST` | `ai_use_frequency: 'NEVER' is not one of [never, tried, weekly, daily, intensive]` | an enum field carries a value outside its set — casing included, the labels are lowercase. Note this one reports the **JSON** field name, unlike the `@Valid` messages above, which report the Java property name |
+| 400 | `BAD_REQUEST` | `ai_tools_used: wrong type or missing` | a field's JSON type doesn't match the DTO, e.g. a string where a list is expected |
+| 400 | `BAD_REQUEST` | `Malformed JSON request body` | the body isn't parseable JSON at all |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
 | 400 | `BAD_REQUEST` | `Pre-assessment already submitted.` | the caller's access already has an `lms_pre_assessments` row |
 
