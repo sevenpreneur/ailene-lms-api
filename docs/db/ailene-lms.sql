@@ -123,6 +123,24 @@ CREATE TYPE lms_pa_motivation_enum AS ENUM (
 -- Tables --
 ------------
 
+-- Lookup
+
+CREATE TABLE lms_levels (
+  id            SERIAL       PRIMARY KEY,
+  level_number  SMALLINT     NOT NULL  UNIQUE,
+  name          VARCHAR      NOT NULL,
+  status        status_enum  NOT NULL  DEFAULT 'active',
+  created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_categories (
+  id    SMALLSERIAL  PRIMARY KEY,
+  name  VARCHAR      NOT NULL  UNIQUE
+);
+
+-- Project & access
+
 CREATE TABLE lms_users (
   id              UUID         PRIMARY KEY,
   full_name       VARCHAR      NOT NULL,
@@ -153,17 +171,6 @@ CREATE TABLE lms_projects (
   updated_at         TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
--- A global lookup shared by every project; level_number is the key the application reads by.
-
-CREATE TABLE lms_levels (
-  id            SERIAL       PRIMARY KEY,
-  level_number  SMALLINT     NOT NULL  UNIQUE,
-  name          VARCHAR      NOT NULL,
-  status        status_enum  NOT NULL  DEFAULT 'active',
-  created_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE lms_groups (
   id           SERIAL       PRIMARY KEY,
   name         VARCHAR      NOT NULL,
@@ -177,15 +184,13 @@ CREATE TABLE lms_accesses (
   id                 CHAR(21)              PRIMARY KEY,
   project_id         CHAR(21)              NOT NULL,
   user_id            UUID                  NOT NULL,
-  group_id           INTEGER                   NULL,
-  current_level_id   INTEGER                   NULL,
+  group_id           INTEGER               NOT NULL,
+  current_level_id   INTEGER               NOT NULL  DEFAULT 1,
   role               lms_access_role_enum  NOT NULL,
   created_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at         TIMESTAMPTZ           NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (project_id, user_id)
 );
-
-
 
 -- Contents
 
@@ -200,8 +205,6 @@ CREATE TABLE lms_chapters (
   updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (id, project_id)
 );
-
--- One scheduled sitting of a chapter. group_id NULL means every group in the project attends it.
 
 CREATE TABLE lms_chapter_sessions (
   id                SERIAL                   PRIMARY KEY,
@@ -278,16 +281,7 @@ CREATE TABLE lms_quiz_options (
   is_correct   BOOLEAN  NOT NULL  DEFAULT FALSE
 );
 
--- Lookup
-
-CREATE TABLE lms_categories (
-  id    SMALLSERIAL  PRIMARY KEY,
-  name  VARCHAR      NOT NULL  UNIQUE
-);
-
 -- Practical Learning
-
--- only_project_id NULL means shared by every project -- the library's only tenant boundary since lms_levels became a lookup.
 
 CREATE TABLE lms_prompts (
   id               SERIAL       PRIMARY KEY,
