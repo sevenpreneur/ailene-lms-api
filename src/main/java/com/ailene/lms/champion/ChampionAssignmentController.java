@@ -22,11 +22,29 @@ public class ChampionAssignmentController {
     private final SecretKeyGuard secretKeyGuard;
 
     @PostMapping("/generate")
-    public ResponseEntity<ApiResponse<GenerateAssignmentResponse>> generate(
+    public ResponseEntity<ApiResponse<AssignmentDraftBatch>> generate(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @Valid @RequestBody GenerateAssignmentRequest request) {
         String jwt = secretKeyGuard.extractBearerToken(authorization);
-        return ApiResponse.success(HttpStatus.OK, "assignment draft generated successfully",
+        return ApiResponse.success(HttpStatus.OK, "assignment drafts generated successfully",
                 championDraftService.generate(jwt, request));
+    }
+
+    @PostMapping("/drafts")
+    public ResponseEntity<ApiResponse<AssignmentDraftBatchesResponse>> drafts(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody ChampionProjectRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        return ApiResponse.success(HttpStatus.OK, "assignment drafts retrieved successfully",
+                championDraftService.listBatches(jwt, request));
+    }
+
+    @PostMapping("/drafts/delete")
+    public ResponseEntity<ApiResponse<DeleteDraftResponse>> deleteDraft(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody DeleteDraftRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        return ApiResponse.success(HttpStatus.OK, "assignment draft deleted successfully",
+                championDraftService.deleteDraft(jwt, request));
     }
 }

@@ -1,6 +1,6 @@
 # Champion
 
-Endpoints for a **champion** — the person who coaches one department's learners. Three groups: `/api/v1/champion/*` for the team roster, one member's profile, the team competency baseline and the periodic report; `/api/v1/champion/assignments/generate` for an AI-drafted library item; `/api/v1/champion/prompts/*` and `/api/v1/champion/use-cases/*` for assigning work and reviewing what comes back. Library browsing (`/api/v1/prompts`, `/api/v1/use-cases`), the category list (`/api/v1/categories`) and coaching notes (`/api/v1/coaching-notes/*`) already live in their own docs and are shared with other roles.
+Endpoints for a **champion** — the person who coaches one department's learners. Three groups: `/api/v1/champion/*` for the team roster, one member's profile, the team competency baseline and the periodic report; `/api/v1/champion/assignments/*` for AI-drafted library items; `/api/v1/champion/prompts/*` and `/api/v1/champion/use-cases/*` for assigning work and reviewing what comes back. Library browsing (`/api/v1/prompts`, `/api/v1/use-cases`), the category list (`/api/v1/categories`) and coaching notes (`/api/v1/coaching-notes/*`) already live in their own docs and are shared with other roles.
 
 Every endpoint takes a `project_id` and requires the caller's `lms_accesses` row on that project to have `role = 'champion'` — anyone else gets `403`.
 
@@ -299,9 +299,11 @@ Everything is computed against the current period — the week (starting Sunday,
 
 ## AI assignment drafts
 
+A champion can ask DeepSeek for several draft library items at once, look through them, and turn one into a real prompt or use case. The drafts from one `generate` call form a **batch** that shares a `batch_id`. Every draft is saved to `lms_assignment_drafts` and is private to the champion who generated it: drafts are not library rows, and students never see them. A draft only becomes a library item through `prompts/create-assignment` or `use-cases/create-assignment`, with its `draft_id`, after the champion has edited it.
+
 ### `POST {base_url}/api/v1/champion/assignments/generate`
 
-Turns a free-text instruction into a draft prompt or use case via DeepSeek, without saving anything.
+Turns one instruction into 1–5 distinct draft variants, with the model choosing both the number and each variant's kind, and saves them as a new batch.
 
 **Authorization:** `Bearer <jwt>`.
 
@@ -310,8 +312,7 @@ Turns a free-text instruction into a draft prompt or use case via DeepSeek, with
 ```json
 {
   "project_id": "V7rdgcYkq9PHQZkwvoA-F",
-  "instruction": "bikin latihan prompt untuk tim HR menulis job description",
-  "kind": "PROMPT"
+  "instruction": "bikin latihan prompt untuk tim HR menulis job description"
 }
 ```
 
@@ -320,8 +321,9 @@ Turns a free-text instruction into a draft prompt or use case via DeepSeek, with
 | `project_id` | string | yes |
 | `instruction` | string, max 2000 | yes |
 | `kind` | `PROMPT` \| `USE_CASE` | no |
+| `count` | integer, 1–5 | no |
 
-Leave `kind` out (or `null`) to let the model choose: `PROMPT` (level 2) is practice writing one prompt from a scenario, `USE_CASE` (level 3) is applying AI to a real recurring task. When `kind` is given, the response always uses it. The model also gets the champion's group name as context.
+Send only `project_id` and `instruction` to let the model decide everything. Before drafting, it writes a short plan: what the instruction actually asks for, which kind fits each variant, how many variants are genuinely worth offering, and what sets each one apart. `PROMPT` (level 2) is practice writing one prompt from a scenario. `USE_CASE` (level 3) is applying AI to a real recurring workflow. One batch may mix the two. A narrow instruction usually yields 1–2 variants and a broad one up to 5, and the server caps the batch at 5. The plan is only logged and is never returned. `kind` and `count` are optional overrides: `kind` forces every variant to that kind, and `count` asks for exactly that many. The model also gets the champion's group name as context.
 
 **Response** — `200 OK`
 
@@ -330,18 +332,31 @@ Leave `kind` out (or `null`) to let the model choose: `PROMPT` (level 2) is prac
   "success": true,
   "code": 200,
   "status": "OK",
-  "message": "assignment draft generated successfully",
+  "message": "assignment drafts generated successfully",
   "data": {
-    "kind": "PROMPT",
-    "name": "Draft Job Description",
-    "description": "Anda adalah HR Generalist ...",
-    "expected_output": "Job description lengkap ...",
-    "category_ids": [87]
+    "batch_id": "46nvsuVvbe7fODMoEO0Pd",
+    "instruction": "bikin latihan prompt untuk tim HR menulis job description",
+    "requested_kind": null,
+    "created_at": "2026-09-25T03:25:03.500731Z",
+    "drafts": [
+      {
+        "id": 12,
+        "kind": "PROMPT",
+        "angle": "Untuk pemula",
+        "name": "Prompt Job Description Posisi Entry-Level",
+        "description": "Anda adalah HR Generalist di perusahaan ritel ...",
+        "expected_output": "Job description lengkap untuk posisi Kasir ...",
+        "category_ids": [6, 87],
+        "used_at": null,
+        "used_prompt_id": null,
+        "used_use_case_id": null
+      }
+    ]
   }
 }
 ```
 
-Nothing is written to the database. The draft is meant to prefill `prompts/create-assignment` or `use-cases/create-assignment` (chosen by `kind`), which does the insert once the champion has edited it. `description` is the scenario for a `PROMPT` and the task description for a `USE_CASE`. `expected_output` is always a string for `PROMPT` and always `null` for `USE_CASE`. `name` is at most 255 characters. `category_ids` holds up to 2 ids, all of which exist in `lms_categories`: ids the model made up are dropped server-side, so it can be `[]`, which is not an error. The champion picks categories by hand in that case. Generation usually takes a few seconds, and the call times out after 90 seconds.
+`drafts` is in generation order and holds 1–5 entries, or at most `count` when you send it. When a variant comes back without a `name`, a `description`, or an `expected_output` on a `PROMPT`, the server drops it rather than failing the whole batch, so a batch can occasionally be shorter than planned. It is never empty. `angle` is a short label for what sets the variant apart (for example `Untuk pemula` or `Tantangan lanjutan`). When the model leaves it out, it falls back to `Varian N`. `description` is the scenario for a `PROMPT` and the task description for a `USE_CASE`. `expected_output` is always a string for `PROMPT` and always `null` for `USE_CASE`. `category_ids` holds up to 2 ids that all exist in `lms_categories`. Ids the model made up are dropped, so it can be `[]`, and the champion then picks categories by hand. `requested_kind` echoes the request's `kind`. `used_at`, `used_prompt_id` and `used_use_case_id` start out `null` (see `draft_id` on `create-assignment`). Generation takes about 4–5 seconds for 2–4 variants, and the server times out after 90 seconds.
 
 **Errors**
 
@@ -350,11 +365,14 @@ Same auth/role/group cases as `members`, plus:
 | Code | Status | Message | When |
 |---|---|---|---|
 | 400 | `BAD_REQUEST` | `instruction: must not be blank` | `instruction` missing or blank (over 2000 characters reads `size must be between 0 and 2000`) |
+| 400 | `BAD_REQUEST` | `count: must be less than or equal to 5` | `count` above 5 (below 1 reads `must be greater than or equal to 1`) |
 | 400 | `BAD_REQUEST` | `kind: 'X' is not one of [PROMPT, USE_CASE]` | `kind` isn't one of the two values |
 | 503 | `SERVICE_UNAVAILABLE` | `AI draft generation is not available right now` | `DEEPSEEK_API_KEY` isn't set on the server |
 | 502 | `BAD_GATEWAY` | `The AI service failed to generate a draft, please try again` | DeepSeek returned an error, or the call failed or timed out |
 | 502 | `BAD_GATEWAY` | `The AI service returned an empty draft, please try again` | DeepSeek answered with no content |
-| 502 | `BAD_GATEWAY` | `The AI service returned an unusable draft, please try again` | the content wasn't JSON, or `name`/`description` (and `expected_output` for `PROMPT`) was missing |
+| 502 | `BAD_GATEWAY` | `The AI service returned an unusable draft, please try again` | the content wasn't JSON, or no variant was usable |
+
+Nothing is saved when any of these errors occurs.
 
 ```json
 {
@@ -365,6 +383,80 @@ Same auth/role/group cases as `members`, plus:
   "data": null
 }
 ```
+
+### `POST {base_url}/api/v1/champion/assignments/drafts`
+
+Lists the caller's own draft batches, newest first.
+
+**Authorization:** `Bearer <jwt>`.
+
+**Request** — `{ "project_id": "..." }`.
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "assignment drafts retrieved successfully",
+  "data": {
+    "batches": [
+      {
+        "batch_id": "46nvsuVvbe7fODMoEO0Pd",
+        "instruction": "bikin latihan prompt untuk tim HR menulis job description",
+        "requested_kind": null,
+        "created_at": "2026-09-25T03:25:03.500731Z",
+        "drafts": [ { "id": 12, "kind": "PROMPT", "angle": "Untuk pemula", "...": "same draft shape as generate" } ]
+      }
+    ]
+  }
+}
+```
+
+Each batch has the same shape as the `generate` response. The response holds only the 30 most recent batches. Drafts inside a batch are in generation order. A batch whose drafts were all deleted no longer appears. Only the caller's drafts are returned, never another champion's, even in the same group.
+
+**Errors** — same auth/role/group cases as `members`.
+
+### `POST {base_url}/api/v1/champion/assignments/drafts/delete`
+
+Deletes one of the caller's own drafts.
+
+**Authorization:** `Bearer <jwt>`.
+
+**Request**
+
+```json
+{ "project_id": "V7rdgcYkq9PHQZkwvoA-F", "draft_id": 12 }
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `project_id` | string | yes |
+| `draft_id` | integer | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "assignment draft deleted successfully",
+  "data": { "deleted": true }
+}
+```
+
+Deleting a draft that was already turned into a library item leaves that prompt or use case untouched.
+
+**Errors**
+
+Same auth/role/group cases as `members`, plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 400 | `BAD_REQUEST` | `draftId: must not be null` | `draft_id` missing |
+| 404 | `NOT_FOUND` | `Draft not found` | no such draft, or it belongs to someone else |
 
 ## Prompt assignments and review
 
@@ -459,8 +551,9 @@ Creates a brand-new library prompt and, optionally, assigns it in the same call.
 | `expected_output` | string | yes |
 | `category_ids` | short[], 1–2 entries | yes |
 | `assignment` | object (same target/deadline/message fields as `assign`) | no |
+| `draft_id` | integer, one of the caller's `assignments/generate` drafts | no |
 
-The prompt is created at **level 2** with `is_self_created = false` — that's what separates a champion-authored library item from a student's self-created practice. Omit `assignment` to add the prompt to the library without sending it to anyone.
+When `draft_id` is sent, the draft is stamped once the prompt is inserted, in the same transaction: `used_at` becomes now and `used_prompt_id` the new prompt's id. The draft's content is not re-read, so the request fields are what gets saved, edits included. A draft can be used more than once, and each use points `used_*` at the newest prompt. The prompt is created at **level 2** with `is_self_created = false` — that's what separates a champion-authored library item from a student's self-created practice. Omit `assignment` to add the prompt to the library without sending it to anyone.
 
 **Response** — `200 OK`
 
@@ -482,6 +575,8 @@ Same cases as `prompts/assign`, except `Prompt not found` is replaced by:
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Some categories were not found` | a `category_ids` entry has no `lms_categories` row |
 | 404 | `NOT_FOUND` | `Prompt level (L2) not found` | the project has no level with `level_number = 2` |
+| 404 | `NOT_FOUND` | `Draft not found` | `draft_id` is not one of the caller's drafts |
+| 400 | `BAD_REQUEST` | `Draft is not a prompt draft` | `draft_id` names a `USE_CASE` draft |
 
 ### `POST {base_url}/api/v1/champion/prompts/submissions`
 
@@ -659,7 +754,7 @@ Assigns an existing library use case to team members. Same request, response and
 
 ### `POST {base_url}/api/v1/champion/use-cases/create-assignment`
 
-Creates a new library use case and optionally assigns it. Same as `prompts/create-assignment` minus `expected_output`; the response carries `use_case_id` instead of `prompt_id`, and the level error reads `Use case level (L3) not found`.
+Creates a new library use case and optionally assigns it. Same as `prompts/create-assignment` minus `expected_output`. The response carries `use_case_id` instead of `prompt_id`, and the level error reads `Use case level (L3) not found`. `draft_id` works the same way, except that it stamps `used_use_case_id` and requires a `USE_CASE` draft (`Draft is not a use case draft` otherwise).
 
 ### `POST {base_url}/api/v1/champion/use-cases/submissions`
 

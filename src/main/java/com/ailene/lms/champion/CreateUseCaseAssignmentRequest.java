@@ -9,5 +9,5 @@ import java.util.List;
 
 public record CreateUseCaseAssignmentRequest(@NotBlank String projectId, @NotBlank @Size(max = 255) String name,
         @NotBlank String description, @NotEmpty @Size(max = 2) List<Short> categoryIds,
-        @Valid AssignmentSpec assignment) {
+        @Valid AssignmentSpec assignment, Integer draftId) {
 }

@@ -29,6 +29,7 @@ public class ChampionAssignmentService {
     private final PromptRepository promptRepository;
     private final UseCaseRepository useCaseRepository;
     private final LevelRepository levelRepository;
+    private final AssignmentDraftRepository assignmentDraftRepository;
 
     @Transactional
     public AssignmentResult assignPrompt(String jwt, AssignLibraryRequest request) {
@@ -76,6 +77,7 @@ public class ChampionAssignmentService {
     public CreatePromptAssignmentResponse createPromptAssignment(String jwt,
             CreatePromptAssignmentRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
+        AssignmentDraft draft = findOwnDraft(champion, request.draftId(), AssignmentKind.PROMPT);
 
         List<Short> categoryIds = request.categoryIds().stream().distinct().toList();
         if (promptRepository.countExistingCategories(categoryIds) != categoryIds.size()) {
@@ -96,6 +98,10 @@ public class ChampionAssignmentService {
         prompt.setStatus(Status.active);
         prompt.setIsSelfCreated(false);
         Integer promptId = promptRepository.save(prompt).getId();
+        if (draft != null) {
+            draft.setUsedAt(OffsetDateTime.now());
+            draft.setUsedPromptId(promptId);
+        }
 
         for (Short categoryId : categoryIds) {
             promptRepository.insertCategory(promptId, categoryId);
@@ -116,6 +122,7 @@ public class ChampionAssignmentService {
     public CreateUseCaseAssignmentResponse createUseCaseAssignment(String jwt,
             CreateUseCaseAssignmentRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
+        AssignmentDraft draft = findOwnDraft(champion, request.draftId(), AssignmentKind.USE_CASE);
 
         List<Short> categoryIds = request.categoryIds().stream().distinct().toList();
         if (useCaseRepository.countExistingCategories(categoryIds) != categoryIds.size()) {
@@ -135,6 +142,10 @@ public class ChampionAssignmentService {
         useCase.setStatus(Status.active);
         useCase.setIsSelfCreated(false);
         Integer useCaseId = useCaseRepository.save(useCase).getId();
+        if (draft != null) {
+            draft.setUsedAt(OffsetDateTime.now());
+            draft.setUsedUseCaseId(useCaseId);
+        }
 
         for (Short categoryId : categoryIds) {
             useCaseRepository.insertCategory(useCaseId, categoryId);
@@ -149,6 +160,20 @@ public class ChampionAssignmentService {
         }
 
         return new CreateUseCaseAssignmentResponse(useCaseId, assigned, targets.size(), targets.size() - assigned);
+    }
+
+    // A used draft can be turned into another library item; used_* then points at the latest one.
+    private AssignmentDraft findOwnDraft(ChampionContext champion, Integer draftId, AssignmentKind kind) {
+        if (draftId == null) {
+            return null;
+        }
+        AssignmentDraft draft = assignmentDraftRepository.findByIdAndChampionAccessId(draftId, champion.accessId())
+                .orElseThrow(() -> new ResourceNotFoundException("Draft not found"));
+        if (draft.getKind() != kind) {
+            throw new BadRequestException(kind == AssignmentKind.PROMPT ? "Draft is not a prompt draft"
+                    : "Draft is not a use case draft");
+        }
+        return draft;
     }
 
     private List<String> resolveAssignmentSpec(ChampionContext champion, AssignmentSpec assignment) {

@@ -322,6 +322,25 @@ CREATE TABLE lms_use_case_categories (
   PRIMARY KEY (use_case_id, category_id)
 );
 
+CREATE TABLE lms_assignment_drafts (
+  id                  SERIAL        PRIMARY KEY,
+  batch_id            CHAR(21)      NOT NULL,
+  champion_access_id  CHAR(21)      NOT NULL,
+  project_id          CHAR(21)      NOT NULL,
+  instruction         TEXT          NOT NULL,
+  requested_kind      VARCHAR(10)       NULL  CHECK (requested_kind IN ('PROMPT', 'USE_CASE')),
+  kind                VARCHAR(10)   NOT NULL  CHECK (kind IN ('PROMPT', 'USE_CASE')),
+  angle               VARCHAR(100)  NOT NULL,
+  name                VARCHAR(255)  NOT NULL,
+  description         TEXT          NOT NULL,
+  expected_output     TEXT              NULL,
+  category_ids        SMALLINT[]    NOT NULL,
+  used_at             TIMESTAMPTZ       NULL,
+  used_prompt_id      INTEGER           NULL,
+  used_use_case_id    INTEGER           NULL,
+  created_at          TIMESTAMPTZ   NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Submissions & Progress
 
 CREATE TABLE lms_level_history (
@@ -525,6 +544,12 @@ ALTER TABLE lms_use_case_categories
   ADD FOREIGN KEY (use_case_id) REFERENCES lms_use_cases (id),
   ADD FOREIGN KEY (category_id) REFERENCES lms_categories (id);
 
+ALTER TABLE lms_assignment_drafts
+  ADD FOREIGN KEY (champion_access_id) REFERENCES lms_accesses (id),
+  ADD FOREIGN KEY (project_id)         REFERENCES lms_projects (id),
+  ADD FOREIGN KEY (used_prompt_id)     REFERENCES lms_prompts (id),
+  ADD FOREIGN KEY (used_use_case_id)   REFERENCES lms_use_cases (id);
+
 -- LMS users & progress
 
 ALTER TABLE lms_tokens
@@ -619,6 +644,7 @@ CREATE INDEX idx_lms_prompts_level_id                ON lms_prompts (level_id);
 CREATE INDEX idx_lms_prompt_categories_category_id   ON lms_prompt_categories (category_id);
 CREATE INDEX idx_lms_use_cases_level_id              ON lms_use_cases (level_id);
 CREATE INDEX idx_lms_use_case_categories_category_id ON lms_use_case_categories (category_id);
+CREATE INDEX idx_lms_assignment_drafts_champion     ON lms_assignment_drafts (champion_access_id, created_at);
 
 -- LMS users & progress
 
