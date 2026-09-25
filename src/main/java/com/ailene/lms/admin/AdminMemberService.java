@@ -1,6 +1,7 @@
 package com.ailene.lms.admin;
 
 import com.ailene.lms.access.AccessRole;
+import com.ailene.lms.auth.PasswordHasher;
 import com.ailene.lms.common.NanoId;
 import com.ailene.lms.common.exception.BadRequestException;
 import com.ailene.lms.common.exception.ConflictException;
@@ -25,16 +26,19 @@ public class AdminMemberService {
     private final AdminGroupService adminGroupService;
     private final UserRepository userRepository;
     private final MailtrapClient mailtrapClient;
+    private final PasswordHasher passwordHasher;
     private final String lmsAppUrl;
 
     public AdminMemberService(AdminGuard adminGuard, AdminRepository adminRepository,
             AdminGroupService adminGroupService, UserRepository userRepository, MailtrapClient mailtrapClient,
+            PasswordHasher passwordHasher,
             @Value("${lms.app-url:https://lms.ailene.id}") String lmsAppUrl) {
         this.adminGuard = adminGuard;
         this.adminRepository = adminRepository;
         this.adminGroupService = adminGroupService;
         this.userRepository = userRepository;
         this.mailtrapClient = mailtrapClient;
+        this.passwordHasher = passwordHasher;
         this.lmsAppUrl = lmsAppUrl.replaceAll("/+$", "");
     }
 
@@ -58,7 +62,8 @@ public class AdminMemberService {
         if (user != null && adminRepository.accessExists(request.projectId(), user.getId())) {
             throw new ConflictException("This user already has access to this project");
         }
-        if (user == null) {
+        boolean isNewUser = user == null;
+        if (isNewUser) {
             String fullName = trimToNull(request.fullName());
             if (fullName == null) {
                 throw new BadRequestException("full_name is required for a user who has never been invited before");
@@ -69,6 +74,14 @@ public class AdminMemberService {
             user.setFullName(fullName);
             String jobTitle = trimToNull(request.jobTitle());
             user.setJobTitle(jobTitle == null ? "" : jobTitle);
+        }
+        // An existing person keeps their profile and any password they have; only a missing one gets filled in.
+        boolean hasNoPassword = user.getPasswordHash() == null || user.getPasswordHash().isBlank();
+        String passwordToSend = request.password() != null && hasNoPassword ? request.password() : null;
+        if (passwordToSend != null) {
+            user.setPasswordHash(passwordHasher.hash(passwordToSend));
+        }
+        if (isNewUser || passwordToSend != null) {
             user.setUpdatedAt(OffsetDateTime.now());
             userRepository.save(user);
         }
@@ -84,11 +97,11 @@ public class AdminMemberService {
 
         String accessUrl = lmsAppUrl + "/" + request.projectId() + "/" + request.role().name();
         String projectName = adminRepository.findProjectName(request.projectId()).orElse("Ailene");
-        AdminInviteEmail invite = AdminInviteEmail.build(member.user().fullName(), projectName, request.role(),
-                member.group().name(), accessUrl);
+        AdminInviteEmail invite = AdminInviteEmail.build(member.user().fullName(), member.user().email(),
+                passwordToSend, projectName, request.role(), member.group().name(), accessUrl);
         boolean emailSent = mailtrapClient.send(member.user().email(), member.user().fullName(), invite.subject(),
                 invite.text(), invite.html(), "LMS Invite");
-        return new InviteMemberResponse(member, emailSent, accessUrl);
+        return new InviteMemberResponse(member, emailSent, passwordToSend != null, accessUrl);
     }
 
     public AdminMemberDto updateMember(String token, UpdateMemberRequest request) {

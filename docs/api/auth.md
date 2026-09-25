@@ -92,7 +92,7 @@ Logs an LMS user in with their email and password, as an alternative to Google.
 
 **Response** — `200 OK`, exactly the same shape as `login/google`: `data.token` is the same kind of JWT, recorded in `lms_tokens`, and works on `check-session`/`logout` and every other endpoint.
 
-The email is trimmed and matched case-insensitively against `lms_users.email`. The password is checked against `lms_users.password_hash`, a BCrypt hash; the plain password is never stored or logged. Unlike `login/google`, this endpoint doesn't touch `avatar`. A user whose `password_hash` is `null` can only sign in with Google. There is no endpoint yet to set or change a password, so a hash currently has to be written directly to the database.
+The email is trimmed and matched case-insensitively against `lms_users.email`. The password is checked against `lms_users.password_hash`, a BCrypt hash; the plain password is never stored or logged. Unlike `login/google`, this endpoint doesn't touch `avatar`. A user whose `password_hash` is `null` can only sign in with Google. The only way to set a password today is the optional `password` on `admin/users/invite` (see `docs/api/admin.md`), which also emails it to the person. It never replaces an existing password: it applies to a new person, or to a registered one who has none yet. There is no endpoint yet for a user to change or reset their own password.
 
 An unknown email, a wrong password, and an account with no password all get the same `401`, and take about the same time to answer, so the endpoint can't be used to find out which emails are registered. There is no rate limit or lockout on failed attempts yet.
 

@@ -8,5 +8,5 @@ import jakarta.validation.constraints.Size;
 
 public record InviteMemberRequest(@NotBlank String projectId, @NotBlank @Email @Size(max = 255) String email,
         @Size(max = 255) String fullName, @Size(max = 255) String jobTitle, @NotNull AccessRole role,
-        @NotNull Integer groupId) {
+        @NotNull Integer groupId, @Size(min = 8, max = 72) String password) {
 }

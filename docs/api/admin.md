@@ -243,7 +243,8 @@ Gives an email address access to a project, in one group with one role, and emai
   "full_name": "Rani Puspita",
   "job_title": "HR Generalist",
   "role": "student",
-  "group_id": 1
+  "group_id": 1,
+  "password": "Rahasia#2026"
 }
 ```
 
@@ -255,8 +256,11 @@ Gives an email address access to a project, in one group with one role, and emai
 | `job_title` | string, max 255 | no |
 | `role` | `champion` \| `student` \| `sponsor` | yes |
 | `group_id` | integer | yes |
+| `password` | string, 8–72 characters | no |
 
-The email is trimmed and lower-cased. If no `lms_users` row has this email yet, one is created from `full_name` (required in that case) and `job_title` (an empty string when omitted). If the person already has an `lms_users` row, for example from another project, it is reused as-is, and `full_name` and `job_title` are ignored. Use `users/update` to change them. A sponsor also needs a group, since every access belongs to exactly one.
+`password` lets the person sign in with `auth/login/password` as well as Google. It is stored only as a BCrypt hash in `lms_users.password_hash` and is never returned in any response, but it **is sent in the invitation email in plain text**, since that is how the person learns it. `password` never replaces an existing password. It is applied to a new person, and to an already-registered person (for example, from another project, or someone who was removed from every project) only if they have **no password yet**. If the email already belongs to someone, the invite otherwise just adds this project to them: their name and job title stay as they are. If they already have a password, `password` is ignored and the email simply tells them to sign in as usual. Leave `password` out to keep a new person Google-only.
+
+The email is trimmed and lower-cased. If no `lms_users` row has this email yet, one is created from `full_name` (required in that case) and `job_title` (an empty string when omitted). If the person already has an `lms_users` row, for example from another project, it is reused as-is, and `full_name` and `job_title` are ignored (so is `password`, unless they have none yet). Use `users/update` to change the name or job title. A sponsor also needs a group, since every access belongs to exactly one.
 
 **Response** — `201 CREATED`
 
@@ -275,12 +279,13 @@ The email is trimmed and lower-cased. If no `lms_users` row has this email yet, 
       "joined_at": "2026-09-25T04:35:01.623907Z"
     },
     "email_sent": true,
+    "password_set": true,
     "access_url": "https://lms.ailene.id/V7rdgcYkq9PHQZkwvoA-F/student"
   }
 }
 ```
 
-`member` has the same shape as one entry of the `users` list. Once access is saved, the invitation email goes out through Mailtrap from `Sevenpreneur <no-reply@sevenpreneur.com>`, the same sender the Sevenpreneur app uses. It is written in Bahasa Indonesia, names the project, role and group, and has a "Buka Ailene LMS" button that links to `access_url`, which is `{LMS_APP_URL}/{project_id}/{role}` (`https://lms.ailene.id/...` by default). The person signs in there with Google using the invited address. Access is granted before the email is sent and is never undone because of the email: when Mailtrap isn't configured on the server (`MAILTRAP_API_TOKEN`), rejects the message, or can't be reached, the invite still succeeds with `email_sent: false`, and `access_url` is there so the link can be shared by hand. An invite that ends in `409` sends no email.
+`member` has the same shape as one entry of the `users` list. `password_set` is `true` only when this invite actually applied the `password` sent (a new person, or an existing one who had none). It is `false` when none was sent, or when the person already had a password and `password` was ignored, which lets the admin UI say "already registered, password unchanged". Once access is saved, the invitation email goes out through Mailtrap from `Sevenpreneur <no-reply@sevenpreneur.com>`, the same sender the Sevenpreneur app uses. It is written in Bahasa Indonesia, names the project, role and group, lists the email and password to sign in with when `password` was sent, and has a "Buka Ailene LMS" button that links to `access_url`, which is `{LMS_APP_URL}/{project_id}/{role}` (`https://lms.ailene.id/...` by default). The person signs in there with Google using the invited address. Access is granted before the email is sent and is never undone because of the email: when Mailtrap isn't configured on the server (`MAILTRAP_API_TOKEN`), rejects the message, or can't be reached, the invite still succeeds with `email_sent: false`, and `access_url` is there so the link can be shared by hand. An invite that ends in `409` sends no email.
 
 **Errors**
 
@@ -289,6 +294,7 @@ The email is trimmed and lower-cased. If no `lms_users` row has this email yet, 
 | 400 | `BAD_REQUEST` | `email: must be a well-formed email address` | `email` isn't an email |
 | 400 | `BAD_REQUEST` | `role: 'admin' is not one of [champion, student, sponsor]` | `role` isn't one of the three |
 | 400 | `BAD_REQUEST` | `full_name is required for a user who has never been invited before` | a new email with no `full_name` |
+| 400 | `BAD_REQUEST` | `password: size must be between 8 and 72` | `password` shorter than 8 or longer than 72 characters (an empty string counts as too short) |
 | 404 | `NOT_FOUND` | `Group not found` | `group_id` isn't a group in this project |
 | 409 | `CONFLICT` | `This user already has access to this project` | the email already has an access row here; change it with `users/update` instead |
 
