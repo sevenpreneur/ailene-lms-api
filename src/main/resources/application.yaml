@@ -44,6 +44,12 @@ openai:
 deepseek:
   api-key: ${DEEPSEEK_API_KEY:}
 
+mailtrap:
+  api-token: ${MAILTRAP_API_TOKEN:}
+
+lms:
+  app-url: ${LMS_APP_URL:https://lms.ailene.id}
+
 management:
   endpoints:
     web:

@@ -44,6 +44,11 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException ex) {
+        return ApiResponse.error(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(BadGatewayException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadGateway(BadGatewayException ex) {
         return ApiResponse.error(HttpStatus.BAD_GATEWAY, ex.getMessage());
