@@ -55,6 +55,17 @@ public class PreAssessmentController {
         return ApiResponse.success(HttpStatus.OK, "pre-assessment recommendations retrieved successfully", response);
     }
 
+    @PostMapping("/recommendations/regenerate")
+    public ResponseEntity<ApiResponse<PreAssessmentRecommendationsResponse>> regenerateRecommendations(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PreAssessmentProjectRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        UUID userId = authService.resolveUserId(jwt);
+        PreAssessmentRecommendationsResponse response = preAssessmentService.regenerateRecommendations(userId,
+                request);
+        return ApiResponse.success(HttpStatus.OK, "pre-assessment recommendations regeneration queued", response);
+    }
+
     @PostMapping("/report-callback")
     public ResponseEntity<ApiResponse<Void>> reportCallback(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,

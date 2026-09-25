@@ -264,11 +264,68 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
 
+### `POST {base_url}/api/v1/pre-assessment/recommendations/regenerate`
+
+Puts the caller's AI recommendations back in the generation queue, so a report that failed (or never ran) can recover.
+
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+
+**Request**
+
+```json
+{ "project_id": "V7rdgcYkq9PHQZkwvoA-F" }
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `project_id` | string | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "pre-assessment recommendations regeneration queued",
+  "data": { "status": "pending", "recommendations": null, "error_message": null, "generated_at": null }
+}
+```
+
+`data` has the same shape as `recommendations`, already in its `pending` state, so a client can swap it in and resume polling `recommendations`. The report is reset to `pending`, its old `recommendations`/`error_message`/`generated_at` are cleared, and the same QStash job `create` sends is published again. Regenerating is allowed in two cases:
+
+- the report is `failed`, and at least a minute has passed since it last changed (a light rate limit against hammering the button);
+- the report has been stuck in `pending` or `processing` for more than 5 minutes, which means the job never arrived or died mid-run.
+
+A `completed` report can't be regenerated.
+
+**Errors**
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` / `Invalid or expired token` / `Session not found or already ended` | same session checks as `recommendations` |
+| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
+| 404 | `NOT_FOUND` | `Pre-assessment belum diisi` | the caller hasn't submitted a pre-assessment in this project |
+| 400 | `BAD_REQUEST` | `Rekomendasi sudah selesai dibuat` | the report is already `completed` |
+| 400 | `BAD_REQUEST` | `Rekomendasi sedang dibuat, mohon tunggu sebentar` | the report is `pending`/`processing` and changed within the last 5 minutes |
+| 400 | `BAD_REQUEST` | `Tunggu sebentar sebelum mencoba lagi` | the report is `failed` but changed within the last minute |
+
+```json
+{
+  "success": false,
+  "code": 400,
+  "status": "BAD_REQUEST",
+  "message": "Rekomendasi sedang dibuat, mohon tunggu sebentar",
+  "data": null
+}
+```
+
 ### `POST {base_url}/api/v1/pre-assessment/report-callback` (internal)
 
-Not a student-facing endpoint. This is the callback `create` schedules via QStash (`QSTASH_TOKEN`/`APP_BASE_URL` env vars, same mechanism as `quizzes/auto-submit`) to actually generate the AI recommendations: flips the report to `status: "processing"`, calls OpenAI (`OPENAI_API_KEY` env var) with the deterministic pillar scores plus the raw answers as context, asks for 3–5 use-case recommendations constrained to the caller's project curriculum (`lms_chapters.name`, via Structured Outputs so the model's reply is guaranteed to match the stored shape), then writes the result back as `status: "completed"` with `recommendations` populated and `generated_at` set. Gated by the same static `SECRET_KEY` bearer token as `POST /api/v1/hello-world` (see `docs/api/auth.md`) rather than a student JWT — QStash is configured to forward that header on delivery.
+Not a student-facing endpoint. This is the callback `create` schedules via QStash (`QSTASH_TOKEN`/`APP_BASE_URL` env vars, same mechanism as `quizzes/auto-submit`) to actually generate the AI recommendations: flips the report to `status: "processing"`, calls DeepSeek (`deepseek-chat`, `DEEPSEEK_API_KEY` env var) with the deterministic pillar scores plus the raw answers as context, and asks for 3–5 use-case recommendations constrained to the caller's project curriculum (`lms_chapters.name`). DeepSeek's `json_object` mode guarantees JSON but not its shape, so the reply is rebuilt server-side into exactly `{ time_saved_label, items: [{ source, title, impact, speed, description, lessons[] }] }`: items missing `title` or `description` are dropped (at most 5 are kept), `impact` is forced into `Tinggi`/`Sedang`/`Rendah` (anything else becomes `Sedang`), `lessons` keeps only names that really are chapters of the project, and missing `source`/`speed`/`time_saved_label` become `-`. Only when at least one usable item remains does it write the result back as `status: "completed"` with `recommendations` populated and `generated_at` set. Gated by the same static `SECRET_KEY` bearer token as `POST /api/v1/hello-world` (see `docs/api/auth.md`) rather than a student JWT — QStash is configured to forward that header on delivery.
 
-Unlike `quizzes/auto-submit`, a failure here does **not** swallow the error into a 200 response: the report row is written to `status: "failed"` with `error_message` (truncated to 500 chars) *before* the exception is rethrown, so the HTTP response back to QStash is a genuine error status — QStash's own retry policy then reattempts delivery on its usual backoff, which re-flips the row through `processing` again on each attempt. There's no separate manual retry/regenerate endpoint — a stuck `failed` report only recovers via a fresh `create` (not possible, one-shot) or a future dedicated retry endpoint.
+Unlike `quizzes/auto-submit`, a failure here does **not** swallow the error into a 200 response: the report row is written to `status: "failed"` with `error_message` (truncated to 500 chars) *before* the exception is rethrown, so the HTTP response back to QStash is a genuine error status — QStash's own retry policy then reattempts delivery on its usual backoff, which re-flips the row through `processing` again on each attempt. If every retry fails, the student can queue it again with `recommendations/regenerate`.
 
 **Authorization:** `Bearer <SECRET_KEY>`.
 
@@ -292,8 +349,10 @@ Unlike `quizzes/auto-submit`, a failure here does **not** swallow the error into
 | 400 | `BAD_REQUEST` | `preAssessmentId: must not be null` | missing `pre_assessment_id` field |
 | 404 | `NOT_FOUND` | `Pre-assessment report not found` | no `lms_pre_assessment_reports` row matches `pre_assessment_id` (shouldn't happen — `create` always seeds one); this lookup happens before the row is flipped to `processing`, so nothing is written on this specific failure |
 | 404 | `NOT_FOUND` | `Pre-assessment not found` / `Access not found` | the `lms_pre_assessments`/`lms_accesses` row disappeared after the report row was seeded (shouldn't happen in practice) — report is written to `status: "failed"` first |
-| 500 | `INTERNAL_SERVER_ERROR` | `Unexpected error` | `OPENAI_API_KEY` missing, the OpenAI call failed, or its response didn't parse/validate — report is written to `status: "failed"` first, with the real reason in `error_message` |
+| 503 | `SERVICE_UNAVAILABLE` | `AI draft generation is not available right now` | `DEEPSEEK_API_KEY` isn't set (the message is shared with the other DeepSeek callers) — report is written to `status: "failed"` first |
+| 502 | `BAD_GATEWAY` | `The AI service failed to generate a draft, please try again` | DeepSeek returned an error or timed out (the message is shared with the other DeepSeek callers) — report is written to `status: "failed"` first |
+| 502 | `BAD_GATEWAY` | `The AI service returned unusable recommendations` | the reply wasn't JSON, or no item had both `title` and `description` — report is written to `status: "failed"` first, with that message in `error_message` |
 
 ## Known gaps
 
-There's no endpoint yet to list a project's own curriculum chapters as a flat name list outside of this callback — `ChapterRepository.findActiveChapterNames` exists only to feed the AI prompt above, not as a public API. There's also no manual retry/regenerate endpoint for a report stuck in `failed` after QStash exhausts its own retries.
+There's no endpoint yet to list a project's own curriculum chapters as a flat name list outside of this callback — `ChapterRepository.findActiveChapterNames` exists only to feed the AI prompt above, not as a public API.
