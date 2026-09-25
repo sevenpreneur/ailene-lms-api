@@ -1,6 +1,6 @@
 # Auth
 
-Google-only login: the client signs the user in with Google and hands us the resulting OAuth **access token** (the `ya29....` one, not the ID token/JWT), which we verify by calling Google's `userinfo` endpoint and exchange for our own JWT, tracked in `lms_tokens`. There is no sign-up flow — the Google account's email must already exist as an `lms_users` row, or the call is rejected. `login/google` is additionally gated by a static bearer token (see below), since the caller has no per-user credential yet at that point; `check-session` and `logout` are gated by that JWT instead. Every endpoint here (and everywhere else in this API) is `POST`, including the ones below that take no request body.
+Two ways to log in, both producing the same session JWT: with Google, or with an email and password (`login/password`, for accounts that have a `password_hash`). With Google, the client signs the user in with Google and hands us the resulting OAuth **access token** (the `ya29....` one, not the ID token/JWT), which we verify by calling Google's `userinfo` endpoint and exchange for our own JWT, tracked in `lms_tokens`. There is no sign-up flow — the Google account's email must already exist as an `lms_users` row, or the call is rejected. `login/google` is additionally gated by a static bearer token (see below), since the caller has no per-user credential yet at that point; `check-session` and `logout` are gated by that JWT instead. Every endpoint here (and everywhere else in this API) is `POST`, including the ones below that take no request body.
 
 ## Endpoints
 
@@ -67,6 +67,51 @@ Example error response (`403 Forbidden`):
   "code": 403,
   "status": "FORBIDDEN",
   "message": "This Google account is not registered as an LMS user"
+}
+```
+
+### `POST {base_url}/api/v1/auth/login/password`
+
+Logs an LMS user in with their email and password, as an alternative to Google.
+
+**Authorization:** `Bearer <SECRET_KEY>`, the same static token as `login/google`.
+
+**Request**
+
+```json
+{
+  "email": "akmal@example.com",
+  "password": "kata-sandi-rahasia"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `email` | string, max 255 | yes |
+| `password` | string, max 72 | yes |
+
+**Response** — `200 OK`, exactly the same shape as `login/google`: `data.token` is the same kind of JWT, recorded in `lms_tokens`, and works on `check-session`/`logout` and every other endpoint.
+
+The email is trimmed and matched case-insensitively against `lms_users.email`. The password is checked against `lms_users.password_hash`, a BCrypt hash; the plain password is never stored or logged. Unlike `login/google`, this endpoint doesn't touch `avatar`. A user whose `password_hash` is `null` can only sign in with Google. There is no endpoint yet to set or change a password, so a hash currently has to be written directly to the database.
+
+An unknown email, a wrong password, and an account with no password all get the same `401`, and take about the same time to answer, so the endpoint can't be used to find out which emails are registered. There is no rate limit or lockout on failed attempts yet.
+
+**Errors**
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Bearer token is invalid` | header present, but doesn't match `SECRET_KEY` |
+| 400 | `BAD_REQUEST` | `email: must not be blank` / `password: must not be blank` | a field is missing or empty |
+| 400 | `BAD_REQUEST` | `password: size must be between 0 and 72` | password longer than 72 characters (BCrypt only reads 72 bytes) |
+| 401 | `UNAUTHORIZED` | `Invalid email or password` | unknown email, wrong password, or the account has no password set |
+
+```json
+{
+  "success": false,
+  "code": 401,
+  "status": "UNAUTHORIZED",
+  "message": "Invalid email or password"
 }
 ```
 

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -25,6 +26,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
     private final AccessRepository accessRepository;
+    private final PasswordHasher passwordHasher;
 
     @Transactional
     public AuthLoginResponse loginWithGoogle(GoogleLoginRequest request) {
@@ -34,6 +36,22 @@ public class AuthService {
                 .orElseThrow(() -> new ForbiddenException("This Google account is not registered as an LMS user"));
 
         user.setAvatar(userInfo.picture());
+        return startSession(user);
+    }
+
+    // One message for unknown email, wrong password and no password set, so the endpoint can't confirm who exists.
+    @Transactional
+    public AuthLoginResponse loginWithPassword(PasswordLoginRequest request) {
+        User user = userRepository
+                .findByEmailIgnoreCase(request.email().trim().toLowerCase(Locale.ROOT)).orElse(null);
+        String hash = user == null ? null : user.getPasswordHash();
+        if (!passwordHasher.matches(request.password(), hash) || user == null) {
+            throw new UnauthorizedException("Invalid email or password");
+        }
+        return startSession(user);
+    }
+
+    private AuthLoginResponse startSession(User user) {
         user.setLastActiveAt(OffsetDateTime.now());
         userRepository.save(user);
 

@@ -30,6 +30,15 @@ public class AuthController {
         return ApiResponse.success(HttpStatus.OK, "login successful", response);
     }
 
+    @PostMapping("/login/password")
+    public ResponseEntity<ApiResponse<AuthLoginResponse>> loginWithPassword(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PasswordLoginRequest request) {
+        secretKeyGuard.requireValidSecretKey(authorization);
+        AuthLoginResponse response = authService.loginWithPassword(request);
+        return ApiResponse.success(HttpStatus.OK, "login successful", response);
+    }
+
     @PostMapping("/check-session")
     public ResponseEntity<ApiResponse<CheckSessionResponse>> checkSession(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {

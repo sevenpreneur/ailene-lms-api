@@ -147,6 +147,7 @@ CREATE TABLE lms_users (
   email           VARCHAR      NOT NULL  UNIQUE,
   avatar          VARCHAR          NULL,
   job_title       VARCHAR      NOT NULL,
+  password_hash   VARCHAR(255)     NULL,
   last_active_at  TIMESTAMPTZ      NULL,
   created_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP

@@ -31,6 +31,10 @@ public class User {
     @Column(name = "job_title", nullable = false)
     private String jobTitle;
 
+    // BCrypt; null means the user can only sign in with Google.
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     @Column(name = "last_active_at")
     private OffsetDateTime lastActiveAt;
 
