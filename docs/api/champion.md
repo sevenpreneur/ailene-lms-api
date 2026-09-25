@@ -222,7 +222,8 @@ Returns the team's competency baseline from the pre-assessment, per member and a
             "avatar": null,
             "avg": 1.4,
             "pillars": [{ "key": "ai_foundation", "score": 1.6 }],
-            "weakest_key": "agentic"
+            "weakest_key": "agentic",
+            "is_me": false
           }
         ]
       }
@@ -233,7 +234,7 @@ Returns the team's competency baseline from the pre-assessment, per member and a
 }
 ```
 
-Pillar scores reuse the same deterministic scoring as `POST /api/v1/pre-assessment/score`. Unlike the sponsor's org view, this one is **member-grained** — a champion coaches people, not departments — so `members` is sorted weakest-first and every aggregate (`team_avg`, `team_pillars`, `readiness`) is a mean over members rather than over departments. `departments` always holds exactly one entry, the champion's own group, so the array shape matches the sponsor endpoint. `team_pillars` is sorted ascending so the biggest gap reads first. Readiness tiers key off each member's average: `ready` ≥ 2.5, `developing` 1.5–2.5, `basic` < 1.5; `gap_large_count` counts members below 2.0. With no submitted pre-assessments you get the same shape with zeroes and an empty `departments`.
+Pillar scores reuse the same deterministic scoring as `POST /api/v1/pre-assessment/score`. Unlike the sponsor's org view, this one is **member-grained** — a champion coaches people, not departments — so `members` is sorted weakest-first and every aggregate (`team_avg`, `team_pillars`, `readiness`) is a mean over members rather than over departments. `departments` always holds exactly one entry, the champion's own group, so the array shape matches the sponsor endpoint. Unlike the rest of this doc, where "team" excludes the caller, the baseline covers **everyone in the group except sponsors**: the caller and any other champions count toward `total_members`/`member_count` (the `completion_percent` denominator) and appear in `members` once they have submitted. `is_me` marks the caller's own row. Sponsors are left out of both the count and the list, because they are org-wide observers who only sit in a group because `group_id` is required. `team_pillars` is sorted ascending so the biggest gap reads first. Readiness tiers key off each member's average: `ready` ≥ 2.5, `developing` 1.5–2.5, `basic` < 1.5; `gap_large_count` counts members below 2.0. With no submitted pre-assessments you get the same shape with zeroes and an empty `departments`.
 
 **Errors** — same shape and cases as `members` above (minus the `group_id` assertion).
 

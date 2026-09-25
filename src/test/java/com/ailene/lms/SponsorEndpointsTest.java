@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -160,7 +161,9 @@ class SponsorEndpointsTest {
     private int firstGroupId() throws Exception {
         String body = call("/api/v1/sponsor/groups/departments", "{\"project_id\":\"" + PROJECT_ID + "\"}")
                 .getResponse().getContentAsString();
-        return JsonPath.read(body, "$.data.departments[0].id");
+        // A freshly created, still-empty group can sort first, so pick one that actually has members.
+        List<Integer> populated = JsonPath.read(body, "$.data.departments[?(@.member_count > 0)].id");
+        return populated.get(0);
     }
 
     private void stubAccess(AccessRole role) {

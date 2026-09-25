@@ -317,10 +317,17 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             FROM lms_pre_assessments pa
             JOIN lms_accesses a ON a.id = pa.access_id
             JOIN lms_users u ON u.id = a.user_id
-            WHERE a.project_id = :projectId AND a.group_id = :groupId
+            WHERE a.project_id = :projectId AND a.group_id = :groupId AND a.role <> 'sponsor'
             """, nativeQuery = true)
     List<TeamPreAssessmentProjection> findTeamPreAssessments(@Param("projectId") String projectId,
             @Param("groupId") Integer groupId);
+
+    // Unlike findTeamMembers this keeps the caller and fellow champions: the baseline measures the whole group.
+    @Query(value = """
+            SELECT COUNT(*) FROM lms_accesses
+            WHERE project_id = :projectId AND group_id = :groupId AND role <> 'sponsor'
+            """, nativeQuery = true)
+    long countGroupLearners(@Param("projectId") String projectId, @Param("groupId") Integer groupId);
 
     @Query(value = """
             SELECT h.access_id AS accessId, lv.level_number AS levelNumber, h.reached_at AS reachedAt

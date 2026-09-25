@@ -30,8 +30,7 @@ public class ChampionBaselineService {
     public PreAssessmentTeamResponse getTeamBaseline(String jwt, ChampionProjectRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
 
-        int totalMembers = championRepository
-                .findTeamMembers(request.projectId(), champion.groupId(), champion.accessId()).size();
+        int totalMembers = (int) championRepository.countGroupLearners(request.projectId(), champion.groupId());
 
         List<TeamPreAssessmentProjection> rows = championRepository
                 .findTeamPreAssessments(request.projectId(), champion.groupId());
@@ -46,7 +45,7 @@ public class ChampionBaselineService {
         Instant measuredAt = null;
         for (PreAssessment preAssessment : preAssessmentRepository.findAllById(byId.keySet())) {
             TeamPreAssessmentProjection row = byId.get(preAssessment.getId());
-            if (row == null || row.getAccessId().equals(champion.accessId())) {
+            if (row == null) {
                 continue;
             }
             PreAssessmentReportSummary report = PreAssessmentReportBuilder.build(preAssessment);
@@ -55,7 +54,7 @@ public class ChampionBaselineService {
                     .toList();
 
             members.add(new TeamMemberBaseline(row.getAccessId(), row.getFullName(), row.getAvatar(),
-                    report.avg(), pillars, report.weakest().key()));
+                    report.avg(), pillars, report.weakest().key(), row.getAccessId().equals(champion.accessId())));
 
             Instant createdAt = preAssessment.getCreatedAt() == null ? null
                     : preAssessment.getCreatedAt().toInstant();
