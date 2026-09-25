@@ -183,12 +183,26 @@ Returns one prompt's full detail by id — unlike the list/assigned endpoints ab
     "deadline_at": "2026-08-27T17:16:17.902873Z",
     "submitted_at": "2026-08-24T17:16:17.902873Z",
     "reviewed_at": null,
-    "is_accepted": true
+    "is_accepted": false,
+    "input": "Kamu adalah HR Generalist ... Buatkan job description ...",
+    "output": "## Marketing Manager ...",
+    "comment": null,
+    "evaluation": {
+      "ai_status": "completed",
+      "ai_feedback": "Anda sudah menjelaskan peran dan tugas dengan jelas. Tambahkan format output yang diinginkan ...",
+      "ai_evaluated_at": "2026-09-12T03:00:04Z",
+      "specificity": 4,
+      "context": 5,
+      "constraints": 2,
+      "examples": 1,
+      "iteration": 3,
+      "average": 3.0
+    }
   }
 }
 ```
 
-`scenario`/`expected_output` are `lms_prompts.scenario`/`expected_output` directly. `level_id`/`level_number` are resolved from `lms_prompts.level_id` — `project_id` isn't part of the request, it's derived from there to check the caller's access. `deadline_at`/`submitted_at`/`reviewed_at`/`is_accepted` reflect the caller's own submission for this prompt (from their `lms_accesses` row in the prompt's project), same semantics as the list endpoint above — all `null` if they have no submission yet.
+`scenario`/`expected_output` are `lms_prompts.scenario`/`expected_output` directly. `level_id`/`level_number` are resolved from `lms_prompts.level_id` — `project_id` isn't part of the request, it's derived from there to check the caller's access. `deadline_at`/`submitted_at`/`reviewed_at`/`is_accepted` reflect the caller's own submission for this prompt (from their `lms_accesses` row in the prompt's project), same semantics as the list endpoint above — all `null` if they have no submission yet. `input`/`output` are what the caller last submitted, and `comment` is the champion's latest review comment (for example, why the work was sent back). `evaluation` is the rubric, in the same shape `champion/prompts/submission-details` documents: the five current scores (the AI's, or the champion's where they overrode one), their `average`, and `ai_feedback`. It is `null` until the caller submits, and `ai_status` stays `pending` for a few seconds after each submit while DeepSeek grades it.
 
 **Errors**
 
@@ -205,7 +219,7 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 
 ### `POST {base_url}/api/v1/prompts/self-create`
 
-Lets a student create their own prompt practice from scratch — not from the curated library, and not assigned by a champion — and immediately submits it for review, in one call. The level is hardcoded to `level_number = 2` (there is no champion-defined target for self-practice, so it can't be scoped to whatever level the student happens to be on), and `expected_output` is set to a fixed placeholder text since the champion reviews the actual input/output pair directly instead. The submission is routed to the champion of the caller's own group (`lms_accesses.group_id`) so it lands in their review queue, the same way a champion-assigned prompt would.
+Lets a student create their own prompt practice from scratch — not from the curated library, and not assigned by a champion — and immediately submits it for review, in one call. The level is hardcoded to `level_number = 2` (there is no champion-defined target for self-practice, so it can't be scoped to whatever level the student happens to be on), and `expected_output` is set to a fixed placeholder text since the champion reviews the actual input/output pair directly instead. The submission is routed to the champion of the caller's own group (`lms_accesses.group_id`) so it lands in their review queue, the same way a champion-assigned prompt would. Like `submit`, it queues an AI rubric evaluation of the submitted `input`/`output`; with no real target output, the model grades against the scenario alone.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
 
@@ -350,7 +364,7 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 
 ### `POST {base_url}/api/v1/prompts/submit`
 
-Submits (or resubmits) the caller's `input`/`output` for a prompt that's already routed to a champion — either via `self-assign` above or a champion-assigned task. Overwrites whatever was submitted before and bumps `submitted_at` to now, so it can be called repeatedly while awaiting review. Once a champion has accepted the submission, further calls are rejected — the student has to be reassigned (or self-assign again) to get another shot.
+Submits (or resubmits) the caller's `input`/`output` for a prompt that's already routed to a champion — either via `self-assign` above or a champion-assigned task. Overwrites whatever was submitted before and bumps `submitted_at` to now, so it can be called repeatedly while awaiting review. Every submit also queues an AI rubric evaluation (see `evaluate-callback` below): the previous scores are cleared and DeepSeek grades the new `input`/`output` a few seconds later. Once a champion has accepted the submission, further calls are rejected — the student has to be reassigned (or self-assign again) to get another shot.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
 
@@ -416,3 +430,44 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the prompt's project |
 | 404 | `NOT_FOUND` | `Assignment not found` | no `lms_prompt_submissions` row exists for `(caller, prompt_id)`, or it exists but `assigned_by_access_id` is still empty — call `self-assign` first, or wait for a champion to assign it |
 | 400 | `BAD_REQUEST` | `Assignment already accepted, cannot resubmit.` | the submission's `is_accepted` is already `true` |
+
+### `POST {base_url}/api/v1/prompts/evaluate-callback`
+
+The QStash worker that grades one prompt submission with DeepSeek. `submit` and `self-create` enqueue it; clients never call it.
+
+**Authorization:** `Bearer <SECRET_KEY>` — the static secret, which QStash forwards (same gate as `pre-assessment/report-callback`).
+
+**Request**
+
+```json
+{ "submission_id": 6, "submitted_at_millis": 1790830800123 }
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `submission_id` | integer | yes |
+| `submitted_at_millis` | long, epoch milliseconds of the `submitted_at` being graded | yes |
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "prompt evaluation processed",
+  "data": null
+}
+```
+
+The model scores the student's prompt on five 1–5 dimensions (specificity, context, constraints, examples, iteration) and writes a 2–4 sentence feedback addressed to the student. It stores them in the submission's `rubric_*` (only the ones a champion hasn't already scored), `ai_feedback` and `ai_evaluated_at` columns, and sets `ai_status = 'completed'`. The prompt's `expected_output` serves as the target, except for a self-created prompt, whose placeholder target is withheld. The student's text is marked as data to be graded, never instructions, so a prompt that tells the grader to award full marks still scores low. A job whose `submitted_at_millis` no longer matches the submission (the student resubmitted since) is skipped with `200`: the newer submission has its own job. A submission that no longer exists is skipped the same way. When DeepSeek fails or returns unusable scores, `ai_status` becomes `failed` and the endpoint answers the error status (`502`/`503`) so QStash retries. If every retry fails, the status stays `failed`.
+
+**Errors**
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Bearer` token |
+| 401 | `UNAUTHORIZED` | `Bearer token is invalid` | the token isn't `SECRET_KEY` |
+| 502 | `BAD_GATEWAY` | `The AI service returned an unusable evaluation` | the model's answer wasn't JSON, or a score was missing or outside 1–5 |
+| 502 | `BAD_GATEWAY` | `The AI service failed to generate a draft, please try again` | DeepSeek returned an error or timed out (the message is shared with the draft generator) |
+| 503 | `SERVICE_UNAVAILABLE` | `AI draft generation is not available right now` | `DEEPSEEK_API_KEY` isn't set (the message is shared with the draft generator) |

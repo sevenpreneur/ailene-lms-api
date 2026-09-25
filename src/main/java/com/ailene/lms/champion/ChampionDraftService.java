@@ -26,6 +26,7 @@ public class ChampionDraftService {
 
     private static final Logger log = LoggerFactory.getLogger(ChampionDraftService.class);
     private static final int MAX_COUNT = 5;
+    private static final double TEMPERATURE = 0.9;
     private static final int PLAN_TOKENS = 400;
     private static final int MAX_BATCHES = 30;
     private static final int NAME_MAX_LENGTH = 255;
@@ -92,7 +93,7 @@ public class ChampionDraftService {
                 "", "Instruksi champion:", instruction);
 
         String content = deepSeekClient.createJsonCompletion(SYSTEM_PROMPT, userPrompt,
-                PLAN_TOKENS + TOKENS_PER_DRAFT * count);
+                PLAN_TOKENS + TOKENS_PER_DRAFT * count, TEMPERATURE);
         List<AssignmentDraft> drafts = parseDrafts(content, request.kind(), request.count(), count, categories);
 
         String batchId = NanoId.generate();

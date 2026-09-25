@@ -35,7 +35,7 @@ public class DeepSeekClient {
     }
 
     // json_object mode only guarantees valid JSON, not a shape: the prompt must say "json" and show an example.
-    public String createJsonCompletion(String systemPrompt, String userPrompt, int maxTokens) {
+    public String createJsonCompletion(String systemPrompt, String userPrompt, int maxTokens, double temperature) {
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("DeepSeek call skipped: DEEPSEEK_API_KEY is not set");
             throw new ServiceUnavailableException("AI draft generation is not available right now");
@@ -44,7 +44,7 @@ public class DeepSeekClient {
         Map<String, Object> body = Map.of("model", MODEL, "messages",
                 List.of(Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", userPrompt)),
-                "response_format", Map.of("type", "json_object"), "temperature", 0.9, "max_tokens", maxTokens);
+                "response_format", Map.of("type", "json_object"), "temperature", temperature, "max_tokens", maxTokens);
 
         DeepSeekChatResponse response;
         try {

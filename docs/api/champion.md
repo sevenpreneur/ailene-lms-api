@@ -618,13 +618,13 @@ Returns the champion's prompt review queue — everything they've assigned, unre
 }
 ```
 
-Sorted unaccepted-first, then newest submission. `subject.text` is the prompt's scenario. `hours_with_ai` and `ai_tool` are always `null` here — they exist so the prompt and use case queues share one response shape.
+Sorted unaccepted-first, then newest submission. `subject.text` is the prompt's scenario. `hours_with_ai` and `ai_tool` are always `null` here — they exist so the prompt and use case queues share one response shape. Each item also carries `evaluation`, the same object as in `submission-details` (so the list can show AI status and `average`), `null` until the student submits. It is always `null` in the use case queue.
 
 **Errors** — same shape and cases as `members` above (minus the `group_id` assertion).
 
 ### `POST {base_url}/api/v1/champion/prompts/submission-details`
 
-Returns one prompt submission in full, including the student's work and any rubric already recorded.
+Returns one prompt submission in full, including the student's work and the AI's rubric evaluation of it.
 
 **Authorization:** `Bearer <jwt>`.
 
@@ -669,15 +669,25 @@ Returns one prompt submission in full, including the student's work and any rubr
     "reviewed_at": null,
     "comment": null,
     "is_accepted": false,
-    "rubric_specificity": null,
-    "rubric_context": null,
-    "rubric_constraints": null,
-    "rubric_examples": null,
-    "rubric_iteration": null,
+    "evaluation": {
+      "ai_status": "completed",
+      "ai_feedback": "Anda sudah menjelaskan peran dan tugas dengan jelas. Tambahkan format output yang diinginkan ...",
+      "ai_evaluated_at": "2026-09-12T03:00:04Z",
+      "specificity": 4,
+      "context": 5,
+      "constraints": 2,
+      "examples": 1,
+      "iteration": 3,
+      "average": 3.0
+    },
     "categories": [{ "id": 87, "name": "Human Capital" }]
   }
 }
 ```
+
+`evaluation` is the rubric, and it is `null` until the student has submitted. The five scores (1–5) live in one set of columns that DeepSeek fills first and the champion may then overwrite through `review`. Every submit or resubmit clears them and sets `ai_status` to `pending`, and an async job then grades the prompt the student wrote against the scenario and target output, usually within a few seconds. A champion override replaces the AI's number for that dimension, so the response carries only the current score, not the AI's original one. If the champion scores a dimension before the AI finishes, the AI leaves it alone.
+
+`ai_status` is `pending`, `completed`, or `failed` (DeepSeek couldn't produce a usable evaluation even after retries). It is `null` for submissions made before AI grading existed, whose scores, if any, were entered by hand. `ai_feedback` is the model's 2–4 sentence feedback addressed to the student. `average` is the mean of the five scores, rounded to 1 decimal, and `null` unless all five are present. The scores decide nothing by themselves: acceptance is still the champion's `review`.
 
 A submission the champion didn't assign comes back as `404`, not `403` — the queue is scoped to them, so from their side it simply doesn't exist.
 
@@ -703,11 +713,7 @@ Accepts or returns a prompt submission for revision, awarding XP once on accepta
   "submission_id": 6,
   "is_accepted": true,
   "comment": "Struktur sudah rapi.",
-  "rubric_specificity": 4,
-  "rubric_context": 4,
-  "rubric_constraints": 3,
-  "rubric_examples": 3,
-  "rubric_iteration": 4
+  "rubric_context": 5
 }
 ```
 
@@ -718,6 +724,8 @@ Accepts or returns a prompt submission for revision, awarding XP once on accepta
 | `is_accepted` | boolean | yes |
 | `comment` | string, max 2000 | required when `is_accepted` is `false` |
 | `rubric_specificity` … `rubric_iteration` | short, 1–5 | no |
+
+DeepSeek scores the rubric when the student submits (see `submission-details`), so the champion doesn't have to. A `rubric_*` field sent here overwrites that one dimension's score. A field left out (or `null`) keeps the current score, whether the AI's or an earlier override.
 
 **Response** — `200 OK`
 
@@ -746,7 +754,7 @@ Same auth/role/group cases as `members`, plus:
 
 ## Use case assignments and review
 
-These mirror the prompt endpoints exactly, with three differences: new use cases are created at **level 3**, there's no `expected_output` field, and the review has no rubric.
+These mirror the prompt endpoints exactly, with three differences: new use cases are created at **level 3**, there's no `expected_output` field, and there is no rubric or AI evaluation.
 
 ### `POST {base_url}/api/v1/champion/use-cases/assign`
 
@@ -806,4 +814,4 @@ One use case submission in full.
 
 ### `POST {base_url}/api/v1/champion/use-cases/review`
 
-Accepts or returns a use case submission. Same as `prompts/review` without the five rubric fields; `xp_awarded` is the use case's `xp_reward`.
+Accepts or returns a use case submission. Same request as `prompts/review`; `xp_awarded` is the use case's `xp_reward`.

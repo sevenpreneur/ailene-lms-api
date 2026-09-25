@@ -125,7 +125,15 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
                    s.reviewed_at AS reviewedAt,
                    s.is_accepted AS accepted,
                    CAST(NULL AS NUMERIC) AS hoursWithAi,
-                   CAST(NULL AS VARCHAR) AS aiTool
+                   CAST(NULL AS VARCHAR) AS aiTool,
+                   s.rubric_specificity AS rubricSpecificity,
+                   s.rubric_context AS rubricContext,
+                   s.rubric_constraints AS rubricConstraints,
+                   s.rubric_examples AS rubricExamples,
+                   s.rubric_iteration AS rubricIteration,
+                   s.ai_status AS aiStatus,
+                   s.ai_feedback AS aiFeedback,
+                   s.ai_evaluated_at AS aiEvaluatedAt
             FROM lms_prompt_submissions s
             JOIN lms_accesses a ON a.id = s.student_access_id
             JOIN lms_users u ON u.id = a.user_id
@@ -152,7 +160,15 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
                    s.reviewed_at AS reviewedAt,
                    s.is_accepted AS accepted,
                    s.hours_with_ai AS hoursWithAi,
-                   s.ai_tool AS aiTool
+                   s.ai_tool AS aiTool,
+                   CAST(NULL AS SMALLINT) AS rubricSpecificity,
+                   CAST(NULL AS SMALLINT) AS rubricContext,
+                   CAST(NULL AS SMALLINT) AS rubricConstraints,
+                   CAST(NULL AS SMALLINT) AS rubricExamples,
+                   CAST(NULL AS SMALLINT) AS rubricIteration,
+                   CAST(NULL AS VARCHAR) AS aiStatus,
+                   CAST(NULL AS TEXT) AS aiFeedback,
+                   CAST(NULL AS TIMESTAMPTZ) AS aiEvaluatedAt
             FROM lms_use_case_submissions s
             JOIN lms_accesses a ON a.id = s.student_access_id
             JOIN lms_users u ON u.id = a.user_id
@@ -207,7 +223,10 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
                    s.rubric_context AS rubricContext,
                    s.rubric_constraints AS rubricConstraints,
                    s.rubric_examples AS rubricExamples,
-                   s.rubric_iteration AS rubricIteration
+                   s.rubric_iteration AS rubricIteration,
+                   s.ai_status AS aiStatus,
+                   s.ai_feedback AS aiFeedback,
+                   s.ai_evaluated_at AS aiEvaluatedAt
             FROM lms_prompt_submissions s
             JOIN lms_accesses a ON a.id = s.student_access_id
             JOIN lms_users u ON u.id = a.user_id

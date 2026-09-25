@@ -404,6 +404,9 @@ CREATE TABLE lms_prompt_submissions (
   rubric_constraints       SMALLINT         NULL,
   rubric_examples          SMALLINT         NULL,
   rubric_iteration         SMALLINT         NULL,
+  ai_status                VARCHAR(10)      NULL  CHECK (ai_status IN ('pending', 'completed', 'failed')),
+  ai_feedback              TEXT             NULL,
+  ai_evaluated_at          TIMESTAMPTZ      NULL,
   created_at               TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at               TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (student_access_id, prompt_id)

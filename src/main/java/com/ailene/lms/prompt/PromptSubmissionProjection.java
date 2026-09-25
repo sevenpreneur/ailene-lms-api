@@ -2,7 +2,7 @@ package com.ailene.lms.prompt;
 
 import java.time.Instant;
 
-public interface PromptSubmissionProjection {
+public interface PromptSubmissionProjection extends PromptEvaluationRow {
     Integer getPromptId();
 
     Instant getDeadlineAt();
@@ -12,4 +12,10 @@ public interface PromptSubmissionProjection {
     Instant getReviewedAt();
 
     Boolean getIsAccepted();
+
+    String getInput();
+
+    String getOutput();
+
+    String getComment();
 }

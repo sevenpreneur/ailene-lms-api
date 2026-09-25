@@ -24,6 +24,7 @@ import java.util.UUID;
 public class PromptController {
 
     private final PromptService promptService;
+    private final PromptEvaluationService promptEvaluationService;
     private final AuthService authService;
     private final SecretKeyGuard secretKeyGuard;
 
@@ -85,5 +86,14 @@ public class PromptController {
         UUID userId = authService.resolveUserId(jwt);
         PromptDetailsResponse response = promptService.submit(userId, request);
         return ApiResponse.success(HttpStatus.OK, "prompt submitted successfully", response);
+    }
+
+    @PostMapping("/evaluate-callback")
+    public ResponseEntity<ApiResponse<Void>> evaluateCallback(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody PromptEvaluationJobRequest request) {
+        secretKeyGuard.requireValidSecretKey(authorization);
+        promptEvaluationService.evaluate(request);
+        return ApiResponse.success(HttpStatus.OK, "prompt evaluation processed", null);
     }
 }

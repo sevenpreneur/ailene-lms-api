@@ -53,7 +53,18 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
                    ps.deadline AS deadlineAt,
                    ps.submitted_at AS submittedAt,
                    ps.reviewed_at AS reviewedAt,
-                   ps.is_accepted AS isAccepted
+                   ps.is_accepted AS isAccepted,
+                   ps.input AS input,
+                   ps.output AS output,
+                   ps.comment AS comment,
+                   ps.rubric_specificity AS rubricSpecificity,
+                   ps.rubric_context AS rubricContext,
+                   ps.rubric_constraints AS rubricConstraints,
+                   ps.rubric_examples AS rubricExamples,
+                   ps.rubric_iteration AS rubricIteration,
+                   ps.ai_status AS aiStatus,
+                   ps.ai_feedback AS aiFeedback,
+                   ps.ai_evaluated_at AS aiEvaluatedAt
             FROM lms_prompt_submissions ps
             WHERE ps.student_access_id = :accessId AND ps.prompt_id IN (:promptIds)
             """, nativeQuery = true)
@@ -100,7 +111,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Integer> {
     long countApprovedSubmissions(@Param("projectId") String projectId, @Param("accessId") String accessId);
 
     @Query(value = """
-            SELECT ps.reviewed_at AS reviewedAt,
+            SELECT COALESCE(ps.ai_evaluated_at, ps.reviewed_at) AS reviewedAt,
                    ps.rubric_specificity AS rubricSpecificity,
                    ps.rubric_context AS rubricContext,
                    ps.rubric_constraints AS rubricConstraints,

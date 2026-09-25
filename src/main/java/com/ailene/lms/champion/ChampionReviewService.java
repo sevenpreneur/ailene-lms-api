@@ -4,6 +4,7 @@ import com.ailene.lms.common.CategorySummary;
 import com.ailene.lms.common.exception.BadRequestException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.prompt.Prompt;
+import com.ailene.lms.prompt.PromptEvaluation;
 import com.ailene.lms.prompt.PromptRepository;
 import com.ailene.lms.prompt.PromptSubmission;
 import com.ailene.lms.prompt.PromptSubmissionRepository;
@@ -40,7 +41,7 @@ public class ChampionReviewService {
         List<ReviewQueueProjection> rows = championRepository.findPromptReviewQueue(champion.accessId());
         Map<Integer, List<CategorySummary>> categories = promptCategories(rows);
 
-        return new ReviewQueueResponse(rows.stream().map(row -> toQueueItem(row, categories)).toList());
+        return new ReviewQueueResponse(rows.stream().map(row -> toQueueItem(row, categories, true)).toList());
     }
 
     public ReviewQueueResponse getUseCaseQueue(String jwt, ChampionProjectRequest request) {
@@ -48,7 +49,7 @@ public class ChampionReviewService {
         List<ReviewQueueProjection> rows = championRepository.findUseCaseReviewQueue(champion.accessId());
         Map<Integer, List<CategorySummary>> categories = useCaseCategories(rows);
 
-        return new ReviewQueueResponse(rows.stream().map(row -> toQueueItem(row, categories)).toList());
+        return new ReviewQueueResponse(rows.stream().map(row -> toQueueItem(row, categories, false)).toList());
     }
 
     public PromptSubmissionDetail getPromptDetail(String jwt, SubmissionDetailRequest request) {
@@ -68,8 +69,7 @@ public class ChampionReviewService {
                                 row.getReviewerAvatar()),
                 row.getDeadline(), row.getMessage(), row.getInput(), row.getOutput(), row.getSubmittedAt(),
                 row.getReviewedAt(), row.getComment(), Boolean.TRUE.equals(row.getAccepted()),
-                row.getRubricSpecificity(), row.getRubricContext(), row.getRubricConstraints(),
-                row.getRubricExamples(), row.getRubricIteration(),
+                row.getSubmittedAt() == null ? null : PromptEvaluation.from(row),
                 categoriesFor(championRepository.findPromptCategories(List.of(row.getItemId())), row.getItemId()));
     }
 
@@ -108,11 +108,22 @@ public class ChampionReviewService {
         submission.setReviewedAt(OffsetDateTime.now());
         submission.setComment(trimToNull(request.comment()));
         submission.setIsAccepted(request.isAccepted());
-        submission.setRubricSpecificity(request.rubricSpecificity());
-        submission.setRubricContext(request.rubricContext());
-        submission.setRubricConstraints(request.rubricConstraints());
-        submission.setRubricExamples(request.rubricExamples());
-        submission.setRubricIteration(request.rubricIteration());
+        // Only the dimensions the champion sent replace the AI's score; the rest keep it.
+        if (request.rubricSpecificity() != null) {
+            submission.setRubricSpecificity(request.rubricSpecificity());
+        }
+        if (request.rubricContext() != null) {
+            submission.setRubricContext(request.rubricContext());
+        }
+        if (request.rubricConstraints() != null) {
+            submission.setRubricConstraints(request.rubricConstraints());
+        }
+        if (request.rubricExamples() != null) {
+            submission.setRubricExamples(request.rubricExamples());
+        }
+        if (request.rubricIteration() != null) {
+            submission.setRubricIteration(request.rubricIteration());
+        }
         promptSubmissionRepository.save(submission);
 
         short xpAwarded = 0;
@@ -168,13 +179,15 @@ public class ChampionReviewService {
         }
     }
 
-    private ReviewQueueItem toQueueItem(ReviewQueueProjection row, Map<Integer, List<CategorySummary>> categories) {
+    private ReviewQueueItem toQueueItem(ReviewQueueProjection row, Map<Integer, List<CategorySummary>> categories,
+            boolean evaluation) {
         return new ReviewQueueItem(row.getId(),
                 new ReviewQueueSubject(row.getItemId(), row.getItemName(), row.getItemText(),
                         new TeamLevelRef(row.getLevelId(), row.getLevelNumber(), row.getLevelName())),
                 new ReviewQueueMember(row.getAccessId(), row.getFullName(), row.getAvatar()), row.getDeadline(),
                 row.getSubmittedAt(), row.getReviewedAt(), Boolean.TRUE.equals(row.getAccepted()),
                 row.getHoursWithAi(), row.getAiTool(),
+                evaluation && row.getSubmittedAt() != null ? PromptEvaluation.from(row) : null,
                 categories.getOrDefault(row.getItemId(), List.of()));
     }
 

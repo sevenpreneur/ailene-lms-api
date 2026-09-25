@@ -2,6 +2,8 @@ package com.ailene.lms.prompt;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -76,6 +78,16 @@ public class PromptSubmission {
 
     @Column(name = "rubric_iteration")
     private Short rubricIteration;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_status", length = 10)
+    private PromptEvaluationStatus aiStatus;
+
+    @Column(name = "ai_feedback")
+    private String aiFeedback;
+
+    @Column(name = "ai_evaluated_at")
+    private OffsetDateTime aiEvaluatedAt;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;

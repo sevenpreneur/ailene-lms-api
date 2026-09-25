@@ -36,6 +36,7 @@ public class PromptService {
     private final PromptSubmissionRepository promptSubmissionRepository;
     private final AccessRepository accessRepository;
     private final LevelRepository levelRepository;
+    private final PromptEvaluationService promptEvaluationService;
 
     public PagedResponse<PromptListItem> list(UUID userId, PromptListRequest request) {
         int page = Pagination.normalizePage(request.page());
@@ -126,7 +127,11 @@ public class PromptService {
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getDeadlineAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getSubmittedAt()),
                 TimeUtils.toOffsetDateTime(submission == null ? null : submission.getReviewedAt()),
-                submission == null ? null : submission.getIsAccepted());
+                submission == null ? null : submission.getIsAccepted(),
+                submission == null ? null : submission.getInput(),
+                submission == null ? null : submission.getOutput(),
+                submission == null ? null : submission.getComment(),
+                submission == null || submission.getSubmittedAt() == null ? null : PromptEvaluation.from(submission));
     }
 
     @Transactional
@@ -170,7 +175,9 @@ public class PromptService {
         submission.setInput(request.input());
         submission.setOutput(request.output());
         submission.setSubmittedAt(OffsetDateTime.now());
+        promptEvaluationService.markPending(submission);
         promptSubmissionRepository.save(submission);
+        promptEvaluationService.scheduleAfterCommit(submission);
 
         return getDetails(userId, new PromptDetailsRequest(promptId));
     }
@@ -230,7 +237,9 @@ public class PromptService {
         submission.setInput(request.input());
         submission.setOutput(request.output());
         submission.setSubmittedAt(OffsetDateTime.now());
+        promptEvaluationService.markPending(submission);
         promptSubmissionRepository.save(submission);
+        promptEvaluationService.scheduleAfterCommit(submission);
 
         return getDetails(userId, new PromptDetailsRequest(prompt.getId()));
     }

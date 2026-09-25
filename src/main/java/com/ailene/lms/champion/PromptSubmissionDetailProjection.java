@@ -1,8 +1,10 @@
 package com.ailene.lms.champion;
 
+import com.ailene.lms.prompt.PromptEvaluationRow;
+
 import java.time.Instant;
 
-public interface PromptSubmissionDetailProjection {
+public interface PromptSubmissionDetailProjection extends PromptEvaluationRow {
     Integer getId();
 
     String getAccessId();
@@ -48,14 +50,4 @@ public interface PromptSubmissionDetailProjection {
     String getComment();
 
     Boolean getAccepted();
-
-    Short getRubricSpecificity();
-
-    Short getRubricContext();
-
-    Short getRubricConstraints();
-
-    Short getRubricExamples();
-
-    Short getRubricIteration();
 }

@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -143,7 +144,7 @@ class ChampionDraftServiceTest {
     }
 
     private void modelReturns(String content) {
-        when(deepSeekClient.createJsonCompletion(anyString(), anyString(), anyInt())).thenReturn(content);
+        when(deepSeekClient.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn(content);
     }
 
     private static GenerateAssignmentRequest request(AssignmentKind kind, Integer count) {
