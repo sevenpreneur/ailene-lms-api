@@ -10,7 +10,9 @@ public enum StatusName {
     NOT_FOUND,
     METHOD_NOT_ALLOWED,
     CONFLICT,
-    INTERNAL_SERVER_ERROR;
+    INTERNAL_SERVER_ERROR,
+    BAD_GATEWAY,
+    SERVICE_UNAVAILABLE;
 
     public static StatusName fromCode(int code) {
         return switch (code) {
@@ -24,6 +26,8 @@ public enum StatusName {
             case 405 -> METHOD_NOT_ALLOWED;
             case 409 -> CONFLICT;
             case 500 -> INTERNAL_SERVER_ERROR;
+            case 502 -> BAD_GATEWAY;
+            case 503 -> SERVICE_UNAVAILABLE;
             default -> INTERNAL_SERVER_ERROR;
         };
     }

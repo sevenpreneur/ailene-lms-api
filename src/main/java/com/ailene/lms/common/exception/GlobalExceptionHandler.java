@@ -44,6 +44,16 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
+    @ExceptionHandler(BadGatewayException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadGateway(BadGatewayException ex) {
+        return ApiResponse.error(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleServiceUnavailable(ServiceUnavailableException ex) {
+        return ApiResponse.error(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleRouteNotFound(NoResourceFoundException ex) {
         return ApiResponse.error(HttpStatus.NOT_FOUND, "No such endpoint");

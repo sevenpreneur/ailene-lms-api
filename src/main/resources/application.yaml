@@ -41,6 +41,9 @@ qstash:
 openai:
   api-key: ${OPENAI_API_KEY:}
 
+deepseek:
+  api-key: ${DEEPSEEK_API_KEY:}
+
 management:
   endpoints:
     web:

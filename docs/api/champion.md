@@ -1,6 +1,6 @@
 # Champion
 
-Endpoints for a **champion** — the person who coaches one department's learners. Three groups: `/api/v1/champion/*` for the team roster, one member's profile, the team competency baseline and the periodic report; `/api/v1/champion/prompts/*` and `/api/v1/champion/use-cases/*` for assigning work and reviewing what comes back. Library browsing (`/api/v1/prompts`, `/api/v1/use-cases`), the category list (`/api/v1/categories`) and coaching notes (`/api/v1/coaching-notes/*`) already live in their own docs and are shared with other roles.
+Endpoints for a **champion** — the person who coaches one department's learners. Three groups: `/api/v1/champion/*` for the team roster, one member's profile, the team competency baseline and the periodic report; `/api/v1/champion/assignments/generate` for an AI-drafted library item; `/api/v1/champion/prompts/*` and `/api/v1/champion/use-cases/*` for assigning work and reviewing what comes back. Library browsing (`/api/v1/prompts`, `/api/v1/use-cases`), the category list (`/api/v1/categories`) and coaching notes (`/api/v1/coaching-notes/*`) already live in their own docs and are shared with other roles.
 
 Every endpoint takes a `project_id` and requires the caller's `lms_accesses` row on that project to have `role = 'champion'` — anyone else gets `403`.
 
@@ -296,6 +296,75 @@ Returns an auto-generated weekly or monthly report draft for the champion's team
 Everything is computed against the current period — the week (starting Sunday, UTC) or calendar month containing today. `level_movements` reads `lms_level_history` for level changes reached inside the period, and `note` lists up to three names plus a `+N` overflow. `recipient` is the project's sponsor, or `null` when the project has none. `sent_reports` is a **synthetic** back-catalogue of the previous three periods for the UI's history list — the app has no report archive table yet, so these are generated labels, not real sent records. `status` is always `draft_auto_generated` for the same reason. `champion_name` is currently a fixed placeholder rather than the caller's own name.
 
 **Errors** — same shape and cases as `members` above (minus the `group_id` assertion).
+
+## AI assignment drafts
+
+### `POST {base_url}/api/v1/champion/assignments/generate`
+
+Turns a free-text instruction into a draft prompt or use case via DeepSeek, without saving anything.
+
+**Authorization:** `Bearer <jwt>`.
+
+**Request**
+
+```json
+{
+  "project_id": "V7rdgcYkq9PHQZkwvoA-F",
+  "instruction": "bikin latihan prompt untuk tim HR menulis job description",
+  "kind": "PROMPT"
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `project_id` | string | yes |
+| `instruction` | string, max 2000 | yes |
+| `kind` | `PROMPT` \| `USE_CASE` | no |
+
+Leave `kind` out (or `null`) to let the model choose: `PROMPT` (level 2) is practice writing one prompt from a scenario, `USE_CASE` (level 3) is applying AI to a real recurring task. When `kind` is given, the response always uses it. The model also gets the champion's group name as context.
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "assignment draft generated successfully",
+  "data": {
+    "kind": "PROMPT",
+    "name": "Draft Job Description",
+    "description": "Anda adalah HR Generalist ...",
+    "expected_output": "Job description lengkap ...",
+    "category_ids": [87]
+  }
+}
+```
+
+Nothing is written to the database. The draft is meant to prefill `prompts/create-assignment` or `use-cases/create-assignment` (chosen by `kind`), which does the insert once the champion has edited it. `description` is the scenario for a `PROMPT` and the task description for a `USE_CASE`. `expected_output` is always a string for `PROMPT` and always `null` for `USE_CASE`. `name` is at most 255 characters. `category_ids` holds up to 2 ids, all of which exist in `lms_categories`: ids the model made up are dropped server-side, so it can be `[]`, which is not an error. The champion picks categories by hand in that case. Generation usually takes a few seconds, and the call times out after 90 seconds.
+
+**Errors**
+
+Same auth/role/group cases as `members`, plus:
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 400 | `BAD_REQUEST` | `instruction: must not be blank` | `instruction` missing or blank (over 2000 characters reads `size must be between 0 and 2000`) |
+| 400 | `BAD_REQUEST` | `kind: 'X' is not one of [PROMPT, USE_CASE]` | `kind` isn't one of the two values |
+| 503 | `SERVICE_UNAVAILABLE` | `AI draft generation is not available right now` | `DEEPSEEK_API_KEY` isn't set on the server |
+| 502 | `BAD_GATEWAY` | `The AI service failed to generate a draft, please try again` | DeepSeek returned an error, or the call failed or timed out |
+| 502 | `BAD_GATEWAY` | `The AI service returned an empty draft, please try again` | DeepSeek answered with no content |
+| 502 | `BAD_GATEWAY` | `The AI service returned an unusable draft, please try again` | the content wasn't JSON, or `name`/`description` (and `expected_output` for `PROMPT`) was missing |
+
+```json
+{
+  "success": false,
+  "code": 502,
+  "status": "BAD_GATEWAY",
+  "message": "The AI service returned an unusable draft, please try again",
+  "data": null
+}
+```
 
 ## Prompt assignments and review
 
