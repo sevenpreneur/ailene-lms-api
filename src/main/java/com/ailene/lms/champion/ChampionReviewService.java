@@ -38,7 +38,7 @@ public class ChampionReviewService {
 
     public ReviewQueueResponse getPromptQueue(String jwt, ChampionProjectRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
-        List<ReviewQueueProjection> rows = championRepository.findPromptReviewQueue(champion.accessId());
+        List<ReviewQueueProjection> rows = championRepository.findPromptReviewQueue(champion.projectId(), champion.groupId());
         Map<Integer, List<CategorySummary>> categories = promptCategories(rows);
 
         return new ReviewQueueResponse(rows.stream().map(row -> toQueueItem(row, categories, true)).toList());
@@ -46,7 +46,7 @@ public class ChampionReviewService {
 
     public ReviewQueueResponse getUseCaseQueue(String jwt, ChampionProjectRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
-        List<ReviewQueueProjection> rows = championRepository.findUseCaseReviewQueue(champion.accessId());
+        List<ReviewQueueProjection> rows = championRepository.findUseCaseReviewQueue(champion.projectId(), champion.groupId());
         Map<Integer, List<CategorySummary>> categories = useCaseCategories(rows);
 
         return new ReviewQueueResponse(rows.stream().map(row -> toQueueItem(row, categories, false)).toList());
@@ -56,7 +56,7 @@ public class ChampionReviewService {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
 
         PromptSubmissionDetailProjection row = championRepository
-                .findPromptSubmissionDetail(request.submissionId(), champion.accessId()).stream()
+                .findPromptSubmissionDetail(request.submissionId(), champion.projectId(), champion.groupId()).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
 
@@ -77,7 +77,7 @@ public class ChampionReviewService {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
 
         UseCaseSubmissionDetailProjection row = championRepository
-                .findUseCaseSubmissionDetail(request.submissionId(), champion.accessId()).stream()
+                .findUseCaseSubmissionDetail(request.submissionId(), champion.projectId(), champion.groupId()).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
 
@@ -99,7 +99,7 @@ public class ChampionReviewService {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
 
         PromptSubmission submission = promptSubmissionRepository.findById(request.submissionId())
-                .filter(row -> champion.accessId().equals(row.getAssignedByAccessId()))
+                .filter(row -> inChampionGroup(champion, row.getStudentAccessId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
         requireReviewable(submission.getSubmittedAt(), submission.getIsAccepted(), request.isAccepted(),
                 request.comment());
@@ -143,7 +143,7 @@ public class ChampionReviewService {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
 
         UseCaseSubmission submission = useCaseSubmissionRepository.findById(request.submissionId())
-                .filter(row -> champion.accessId().equals(row.getAssignedByAccessId()))
+                .filter(row -> inChampionGroup(champion, row.getStudentAccessId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
         requireReviewable(submission.getSubmittedAt(), submission.getIsAccepted(), request.isAccepted(),
                 request.comment());
@@ -164,6 +164,11 @@ public class ChampionReviewService {
         }
 
         return new ReviewResult(xpAwarded);
+    }
+
+    // Any champion of the student's group may review, not only the one the submission was routed to.
+    private boolean inChampionGroup(ChampionContext champion, String studentAccessId) {
+        return championRepository.isInGroup(studentAccessId, champion.projectId(), champion.groupId());
     }
 
     private void requireReviewable(OffsetDateTime submittedAt, Boolean alreadyAccepted, Boolean isAccepted,

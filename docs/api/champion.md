@@ -581,7 +581,7 @@ Same cases as `prompts/assign`, except `Prompt not found` is replaced by:
 
 ### `POST {base_url}/api/v1/champion/prompts/submissions`
 
-Returns the champion's prompt review queue — everything they've assigned, unreviewed first.
+Returns the champion's prompt review queue — every submission from a member of the group they lead, whichever champion of that group it was routed to, unreviewed first.
 
 **Authorization:** `Bearer <jwt>`.
 
@@ -698,7 +698,7 @@ Same auth/role/group cases as `members`, plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
-| 404 | `NOT_FOUND` | `Submission not found` | no such submission, or it wasn't assigned by this champion |
+| 404 | `NOT_FOUND` | `Submission not found` | no such submission, or its student isn't in the group this champion leads |
 
 ### `POST {base_url}/api/v1/champion/prompts/review`
 
@@ -748,7 +748,7 @@ Same auth/role/group cases as `members`, plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
-| 404 | `NOT_FOUND` | `Submission not found` | no such submission, or it wasn't assigned by this champion |
+| 404 | `NOT_FOUND` | `Submission not found` | no such submission, or its student isn't in the group this champion leads |
 | 400 | `BAD_REQUEST` | `Student has not submitted yet` | `submitted_at` is still null |
 | 400 | `BAD_REQUEST` | `Submission already accepted` | the submission was already accepted; acceptance is final |
 | 400 | `BAD_REQUEST` | `Comment required when sending back for revision` | `is_accepted` is `false` with a blank `comment` |

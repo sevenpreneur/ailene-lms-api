@@ -139,10 +139,10 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             JOIN lms_users u ON u.id = a.user_id
             JOIN lms_prompts p ON p.id = s.prompt_id
             LEFT JOIN lms_levels lv ON lv.id = p.level_id
-            WHERE s.assigned_by_access_id = :championAccessId
+            WHERE a.project_id = :projectId AND a.group_id = :groupId
             ORDER BY s.is_accepted ASC, s.submitted_at DESC NULLS LAST
             """, nativeQuery = true)
-    List<ReviewQueueProjection> findPromptReviewQueue(@Param("championAccessId") String championAccessId);
+    List<ReviewQueueProjection> findPromptReviewQueue(@Param("projectId") String projectId, @Param("groupId") Integer groupId);
 
     @Query(value = """
             SELECT s.id AS id,
@@ -174,10 +174,10 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             JOIN lms_users u ON u.id = a.user_id
             JOIN lms_use_cases uc ON uc.id = s.use_case_id
             LEFT JOIN lms_levels lv ON lv.id = uc.level_id
-            WHERE s.assigned_by_access_id = :championAccessId
+            WHERE a.project_id = :projectId AND a.group_id = :groupId
             ORDER BY s.is_accepted ASC, s.submitted_at DESC NULLS LAST
             """, nativeQuery = true)
-    List<ReviewQueueProjection> findUseCaseReviewQueue(@Param("championAccessId") String championAccessId);
+    List<ReviewQueueProjection> findUseCaseReviewQueue(@Param("projectId") String projectId, @Param("groupId") Integer groupId);
 
     @Query(value = """
             SELECT pc.prompt_id AS ownerId, c.id AS categoryId, c.name AS categoryName
@@ -234,10 +234,10 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             LEFT JOIN lms_levels lv ON lv.id = p.level_id
             LEFT JOIN lms_accesses ra ON ra.id = s.reviewed_by_access_id
             LEFT JOIN lms_users reviewer ON reviewer.id = ra.user_id
-            WHERE s.id = :submissionId AND s.assigned_by_access_id = :championAccessId
+            WHERE s.id = :submissionId AND a.project_id = :projectId AND a.group_id = :groupId
             """, nativeQuery = true)
     List<PromptSubmissionDetailProjection> findPromptSubmissionDetail(@Param("submissionId") Integer submissionId,
-            @Param("championAccessId") String championAccessId);
+            @Param("projectId") String projectId, @Param("groupId") Integer groupId);
 
     @Query(value = """
             SELECT s.id AS id,
@@ -274,10 +274,10 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
             LEFT JOIN lms_levels lv ON lv.id = uc.level_id
             LEFT JOIN lms_accesses ra ON ra.id = s.reviewed_by_access_id
             LEFT JOIN lms_users reviewer ON reviewer.id = ra.user_id
-            WHERE s.id = :submissionId AND s.assigned_by_access_id = :championAccessId
+            WHERE s.id = :submissionId AND a.project_id = :projectId AND a.group_id = :groupId
             """, nativeQuery = true)
     List<UseCaseSubmissionDetailProjection> findUseCaseSubmissionDetail(
-            @Param("submissionId") Integer submissionId, @Param("championAccessId") String championAccessId);
+            @Param("submissionId") Integer submissionId, @Param("projectId") String projectId, @Param("groupId") Integer groupId);
 
     @Modifying
     @Query(value = """
@@ -358,26 +358,29 @@ public interface ChampionRepository extends JpaRepository<Access, String> {
     List<MemberQuizProjection> findMemberQuizSubmissions(@Param("accessId") String accessId);
 
     @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM lms_accesses a WHERE a.id = :accessId AND a.project_id = :projectId AND a.group_id = :groupId)
+            """, nativeQuery = true)
+    boolean isInGroup(@Param("accessId") String accessId, @Param("projectId") String projectId, @Param("groupId") Integer groupId);
+
+    @Query(value = """
             SELECT s.id AS id, p.name AS itemName, CAST(NULL AS VARCHAR) AS aiTool, s.submitted_at AS submittedAt,
                    s.reviewed_at AS reviewedAt, s.is_accepted AS accepted, s.created_at AS createdAt
             FROM lms_prompt_submissions s
             JOIN lms_prompts p ON p.id = s.prompt_id
-            WHERE s.student_access_id = :accessId AND s.assigned_by_access_id = :championAccessId
+            WHERE s.student_access_id = :accessId
             ORDER BY s.submitted_at DESC NULLS LAST, s.created_at DESC
             """, nativeQuery = true)
-    List<MemberSubmissionProjection> findMemberPromptSubmissions(@Param("accessId") String accessId,
-            @Param("championAccessId") String championAccessId);
+    List<MemberSubmissionProjection> findMemberPromptSubmissions(@Param("accessId") String accessId);
 
     @Query(value = """
             SELECT s.id AS id, uc.name AS itemName, s.ai_tool AS aiTool, s.submitted_at AS submittedAt,
                    s.reviewed_at AS reviewedAt, s.is_accepted AS accepted, s.created_at AS createdAt
             FROM lms_use_case_submissions s
             JOIN lms_use_cases uc ON uc.id = s.use_case_id
-            WHERE s.student_access_id = :accessId AND s.assigned_by_access_id = :championAccessId
+            WHERE s.student_access_id = :accessId
             ORDER BY s.submitted_at DESC NULLS LAST, s.created_at DESC
             """, nativeQuery = true)
-    List<MemberSubmissionProjection> findMemberUseCaseSubmissions(@Param("accessId") String accessId,
-            @Param("championAccessId") String championAccessId);
+    List<MemberSubmissionProjection> findMemberUseCaseSubmissions(@Param("accessId") String accessId);
 
     @Query(value = """
             SELECT qs.submitted_at AS at FROM lms_quiz_submissions qs

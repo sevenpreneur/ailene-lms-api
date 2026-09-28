@@ -69,7 +69,8 @@ public class ChampionReportService {
             }
         }
 
-        int acceptedPrompts = (int) championRepository.findPromptReviewQueue(champion.accessId()).stream()
+        int acceptedPrompts = (int) championRepository
+                .findPromptReviewQueue(champion.projectId(), champion.groupId()).stream()
                 .filter(row -> row.getSubmittedAt() != null && row.getSubmittedAt().isAfter(periodStart)
                         && Boolean.TRUE.equals(row.getAccepted()))
                 .count();

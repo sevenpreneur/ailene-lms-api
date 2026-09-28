@@ -124,9 +124,9 @@ public class ChampionTeamService {
         List<MemberQuizProjection> quizzes = championRepository
                 .findMemberQuizSubmissions(request.memberAccessId());
         List<MemberSubmissionProjection> promptSubs = championRepository
-                .findMemberPromptSubmissions(request.memberAccessId(), champion.accessId());
+                .findMemberPromptSubmissions(request.memberAccessId());
         List<MemberSubmissionProjection> useCaseSubs = championRepository
-                .findMemberUseCaseSubmissions(request.memberAccessId(), champion.accessId());
+                .findMemberUseCaseSubmissions(request.memberAccessId());
 
         Map<String, Short> bestQuizScore = new HashMap<>();
         for (MemberQuizProjection quiz : quizzes) {
