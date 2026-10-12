@@ -119,6 +119,31 @@ CREATE TYPE lms_pa_motivation_enum AS ENUM (
   'eager'
 );
 
+-- Enumeration for the lms_pa_* tables
+
+CREATE TYPE lms_pa_section_enum AS ENUM (
+  'profile',
+  'scenario',
+  'practice',
+  'behaviour'
+);
+
+CREATE TYPE lms_pa_dimension_enum AS ENUM (
+  'knowledge',
+  'skills',
+  'behaviours'
+);
+
+CREATE TYPE lms_pa_item_type_enum AS ENUM (
+  'single_choice',
+  'text'
+);
+
+CREATE TYPE lms_pa_attempt_status_enum AS ENUM (
+  'submitted',
+  'scored'
+);
+
 ------------
 -- Tables --
 ------------
@@ -485,6 +510,160 @@ CREATE TABLE lms_pre_assessment_reports (
   updated_at          TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE lms_pa_clusters (
+  id           SMALLSERIAL  PRIMARY KEY,
+  code         VARCHAR      NOT NULL  UNIQUE,
+  name         VARCHAR      NOT NULL,
+  order_index  SMALLINT     NOT NULL  DEFAULT 0
+);
+
+CREATE TABLE lms_pa_domains (
+  id            SMALLSERIAL  PRIMARY KEY,
+  cluster_id    SMALLINT     NOT NULL,
+  code          VARCHAR      NOT NULL  UNIQUE,
+  cfte_number   SMALLINT     NOT NULL  UNIQUE  CHECK (cfte_number BETWEEN 1 AND 10),
+  name          VARCHAR      NOT NULL
+);
+
+CREATE TABLE lms_pa_forms (
+  id                SERIAL       PRIMARY KEY,
+  code              VARCHAR      NOT NULL,
+  version           SMALLINT     NOT NULL  DEFAULT 1,
+  name              VARCHAR      NOT NULL,
+  duration_minutes  SMALLINT     NOT NULL,
+  status            status_enum  NOT NULL  DEFAULT 'inactive',
+  published_at      TIMESTAMPTZ      NULL,
+  created_at        TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (code, version)
+);
+
+CREATE TABLE lms_pa_items (
+  id                 SERIAL                 PRIMARY KEY,
+  form_id            INTEGER                NOT NULL,
+  item_code          VARCHAR(10)            NOT NULL,
+  section            lms_pa_section_enum    NOT NULL,
+  type               lms_pa_item_type_enum  NOT NULL,
+  domain_id          SMALLINT                   NULL,
+  dimension          lms_pa_dimension_enum      NULL,
+  cfte_level         SMALLINT                   NULL  CHECK (cfte_level BETWEEN 1 AND 3),
+  question           TEXT                   NOT NULL,
+  is_critical        BOOLEAN                NOT NULL  DEFAULT FALSE,
+  is_behaviour_gate  BOOLEAN                NOT NULL  DEFAULT FALSE,
+  overclaim_item_id  INTEGER                    NULL,
+  grading_config     JSONB                      NULL,
+  order_index        SMALLINT               NOT NULL  DEFAULT 0,
+  created_at         TIMESTAMPTZ            NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMPTZ            NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (form_id, item_code),
+  UNIQUE (id, form_id),
+  CHECK (section = 'profile' OR (domain_id IS NOT NULL AND dimension IS NOT NULL)),
+  CHECK (grading_config IS NULL OR type = 'text')
+);
+
+CREATE TABLE lms_pa_item_options (
+  id            SERIAL        PRIMARY KEY,
+  item_id       INTEGER       NOT NULL,
+  option_code   VARCHAR(10)   NOT NULL,
+  text          TEXT          NOT NULL,
+  credit        NUMERIC(3,2)      NULL  CHECK (credit BETWEEN 0 AND 1),
+  is_dont_know  BOOLEAN       NOT NULL  DEFAULT FALSE,
+  flag          VARCHAR(30)       NULL,
+  order_index   SMALLINT      NOT NULL  DEFAULT 0,
+  UNIQUE (item_id, option_code),
+  UNIQUE (id, item_id)
+);
+
+CREATE TABLE lms_pa_scoring_configs (
+  id                         SERIAL        PRIMARY KEY,
+  name                       VARCHAR       NOT NULL,
+  is_active                  BOOLEAN       NOT NULL  DEFAULT FALSE,
+  security_gate_max_band     SMALLINT      NOT NULL  DEFAULT 1,
+  behaviour_gate_from_band   SMALLINT      NOT NULL  DEFAULT 3,
+  behaviour_gate_max_band    SMALLINT      NOT NULL  DEFAULT 2,
+  behaviour_gate_min_score   NUMERIC(5,2)  NOT NULL  DEFAULT 50,
+  behaviour_gate_min_credit  NUMERIC(3,2)  NOT NULL  DEFAULT 0.50,
+  overclaim_min_credit       NUMERIC(3,2)  NOT NULL  DEFAULT 0.75,
+  overclaim_capped_credit    NUMERIC(3,2)  NOT NULL  DEFAULT 0.25,
+  target_band                SMALLINT      NOT NULL  DEFAULT 2  CHECK (target_band BETWEEN 0 AND 5),
+  created_at                 TIMESTAMPTZ   NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE lms_pa_bands (
+  config_id  INTEGER       NOT NULL,
+  band       SMALLINT      NOT NULL  CHECK (band BETWEEN 0 AND 5),
+  name       VARCHAR       NOT NULL,
+  level      SMALLINT      NOT NULL  CHECK (level BETWEEN 0 AND 3),
+  min_p1     NUMERIC(5,2)      NULL,
+  min_p2     NUMERIC(5,2)      NULL,
+  min_p3     NUMERIC(5,2)      NULL,
+  PRIMARY KEY (config_id, band)
+);
+
+CREATE TABLE lms_pa_attempts (
+  id                     SERIAL                      PRIMARY KEY,
+  access_id              CHAR(21)                    NOT NULL,
+  form_id                INTEGER                     NOT NULL,
+  config_id              INTEGER                         NULL,
+  status                 lms_pa_attempt_status_enum  NOT NULL  DEFAULT 'submitted',
+  p1                     NUMERIC(5,2)                    NULL,
+  p2                     NUMERIC(5,2)                    NULL,
+  p3                     NUMERIC(5,2)                    NULL,
+  knowledge_score        NUMERIC(5,2)                    NULL,
+  skills_score           NUMERIC(5,2)                    NULL,
+  behaviours_score       NUMERIC(5,2)                    NULL,
+  raw_band               SMALLINT                        NULL  CHECK (raw_band BETWEEN 0 AND 5),
+  final_band             SMALLINT                        NULL  CHECK (final_band BETWEEN 0 AND 5),
+  level                  SMALLINT                        NULL  CHECK (level BETWEEN 0 AND 3),
+  security_gate_passed   BOOLEAN                         NULL,
+  behaviour_gate_passed  BOOLEAN                         NULL,
+  is_overclaim           BOOLEAN                         NULL,
+  is_shadow_ai           BOOLEAN                         NULL,
+  started_at             TIMESTAMPTZ                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  submitted_at           TIMESTAMPTZ                     NULL,
+  scored_at              TIMESTAMPTZ                     NULL,
+  updated_at             TIMESTAMPTZ                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (access_id),
+  UNIQUE (id, form_id)
+);
+
+CREATE TABLE lms_pa_answers (
+  attempt_id          INTEGER       NOT NULL,
+  item_id             INTEGER       NOT NULL,
+  form_id             INTEGER       NOT NULL,
+  option_id           INTEGER           NULL,
+  text_value          TEXT              NULL,
+  credit              NUMERIC(3,2)      NULL  CHECK (credit BETWEEN 0 AND 1),
+  rubric_scores       JSONB             NULL,
+  rubric_total        SMALLINT          NULL,
+  has_sensitive_data  BOOLEAN       NOT NULL  DEFAULT FALSE,
+  ai_feedback         TEXT              NULL,
+  graded_at           TIMESTAMPTZ       NULL,
+  answered_at         TIMESTAMPTZ   NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMPTZ   NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (attempt_id, item_id),
+  CHECK (num_nonnulls(option_id, text_value) = 1)
+);
+
+CREATE TABLE lms_pa_attempt_domain_scores (
+  attempt_id  INTEGER       NOT NULL,
+  domain_id   SMALLINT      NOT NULL,
+  score       NUMERIC(5,2)  NOT NULL,
+  item_count  SMALLINT      NOT NULL,
+  PRIMARY KEY (attempt_id, domain_id)
+);
+
+CREATE TABLE lms_pa_attempt_reports (
+  id               SERIAL       PRIMARY KEY,
+  attempt_id       INTEGER      NOT NULL  UNIQUE,
+  status           VARCHAR      NOT NULL  DEFAULT 'pending',
+  recommendations  JSONB            NULL,
+  error_message    TEXT             NULL,
+  queued_at        TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  generated_at     TIMESTAMPTZ      NULL,
+  updated_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Miscellaneous
 
 CREATE TABLE lms_announcement (
@@ -611,6 +790,37 @@ ALTER TABLE lms_pre_assessments
 ALTER TABLE lms_pre_assessment_reports
   ADD FOREIGN KEY (pre_assessment_id) REFERENCES lms_pre_assessments (id);
 
+ALTER TABLE lms_pa_domains
+  ADD FOREIGN KEY (cluster_id) REFERENCES lms_pa_clusters (id);
+
+ALTER TABLE lms_pa_items
+  ADD FOREIGN KEY (form_id)                    REFERENCES lms_pa_forms (id),
+  ADD FOREIGN KEY (domain_id)                  REFERENCES lms_pa_domains (id),
+  ADD FOREIGN KEY (overclaim_item_id, form_id) REFERENCES lms_pa_items (id, form_id);
+
+ALTER TABLE lms_pa_item_options
+  ADD FOREIGN KEY (item_id) REFERENCES lms_pa_items (id);
+
+ALTER TABLE lms_pa_bands
+  ADD FOREIGN KEY (config_id) REFERENCES lms_pa_scoring_configs (id);
+
+ALTER TABLE lms_pa_attempts
+  ADD FOREIGN KEY (access_id) REFERENCES lms_accesses (id),
+  ADD FOREIGN KEY (form_id)   REFERENCES lms_pa_forms (id),
+  ADD FOREIGN KEY (config_id) REFERENCES lms_pa_scoring_configs (id);
+
+ALTER TABLE lms_pa_answers
+  ADD FOREIGN KEY (attempt_id, form_id) REFERENCES lms_pa_attempts (id, form_id),
+  ADD FOREIGN KEY (item_id, form_id)    REFERENCES lms_pa_items (id, form_id),
+  ADD FOREIGN KEY (option_id, item_id)  REFERENCES lms_pa_item_options (id, item_id);
+
+ALTER TABLE lms_pa_attempt_domain_scores
+  ADD FOREIGN KEY (attempt_id) REFERENCES lms_pa_attempts (id),
+  ADD FOREIGN KEY (domain_id)  REFERENCES lms_pa_domains (id);
+
+ALTER TABLE lms_pa_attempt_reports
+  ADD FOREIGN KEY (attempt_id) REFERENCES lms_pa_attempts (id);
+
 -- LMS misc
 
 ALTER TABLE lms_announcement
@@ -669,6 +879,18 @@ CREATE INDEX idx_lms_prompt_subs_reviewed_by         ON lms_prompt_submissions (
 CREATE INDEX idx_lms_use_case_subs_use_case_id       ON lms_use_case_submissions (use_case_id);
 CREATE INDEX idx_lms_use_case_subs_assigned_by       ON lms_use_case_submissions (assigned_by_access_id);
 CREATE INDEX idx_lms_use_case_subs_reviewed_by       ON lms_use_case_submissions (reviewed_by_access_id);
+
+-- LMS pre-assessment
+
+CREATE UNIQUE INDEX idx_lms_pa_forms_active           ON lms_pa_forms ((TRUE)) WHERE status = 'active';
+CREATE UNIQUE INDEX idx_lms_pa_scoring_configs_active ON lms_pa_scoring_configs (is_active) WHERE is_active;
+CREATE INDEX idx_lms_pa_domains_cluster_id           ON lms_pa_domains (cluster_id);
+CREATE INDEX idx_lms_pa_items_domain_id              ON lms_pa_items (domain_id);
+CREATE INDEX idx_lms_pa_attempts_form_id             ON lms_pa_attempts (form_id);
+CREATE INDEX idx_lms_pa_attempts_config_id           ON lms_pa_attempts (config_id);
+CREATE INDEX idx_lms_pa_answers_item_id              ON lms_pa_answers (item_id);
+CREATE INDEX idx_lms_pa_answers_option_id            ON lms_pa_answers (option_id);
+CREATE INDEX idx_lms_pa_attempt_domain_scores_domain ON lms_pa_attempt_domain_scores (domain_id);
 
 ---------------
 -- Functions --
@@ -773,6 +995,31 @@ CREATE TRIGGER update_lms_use_case_submissions_updated_at_trigger
 
 CREATE TRIGGER update_lms_pre_assessment_reports_updated_at_trigger
   BEFORE UPDATE ON lms_pre_assessment_reports
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_pa_forms_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_forms
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_pa_items_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_items
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_pa_attempts_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_attempts
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_pa_answers_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_answers
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_pa_attempt_reports_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_attempt_reports
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 

@@ -435,7 +435,7 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 
 The QStash worker that grades one prompt submission with DeepSeek. `submit` and `self-create` enqueue it; clients never call it.
 
-**Authorization:** `Bearer <SECRET_KEY>` — the static secret, which QStash forwards (same gate as `pre-assessment/report-callback`).
+**Authorization:** `Bearer <SECRET_KEY>` — the static secret, which QStash forwards (same gate as `hello-world`).
 
 **Request**
 

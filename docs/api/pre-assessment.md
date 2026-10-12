@@ -1,274 +1,14 @@
 # Pre-Assessment
 
-Endpoints for a student's one-time onboarding questionnaire (`lms_pre_assessments`) and its generated report (`lms_pre_assessment_reports`). A student can only ever have one pre-assessment per project — `access_id` is unique on `lms_pre_assessments` — so `create` is a one-shot submission, not upsertable. The report has two independent parts: a deterministic pillar score computed on the fly from the raw answers (`score`), and a separate AI-generated recommendation list that's produced asynchronously after submission (`recommendations`).
+Endpoints for a student's one-time CFTE AIPF pre-assessment. The questions live in the database (`lms_pa_forms`/`lms_pa_items`/`lms_pa_item_options`), and only one form is ever `active`. Each access gets exactly one attempt (`lms_pa_attempts`, `UNIQUE (access_id)`) with one `lms_pa_answers` row per question. `submit` only stores answers. `score` grades the written answers with DeepSeek, computes the band the first time it's called, and stores the result. The older hardcoded questionnaire (`lms_pre_assessments`) has no endpoints left: `create`, `recommendations`, `recommendations/regenerate`, and `report-callback` were removed.
 
 ## Endpoints
 
-### `POST {base_url}/api/v1/pre-assessment/create`
+### `POST {base_url}/api/v1/pre-assessment/questions`
 
-Submits the student's pre-assessment questionnaire for a project, seeds its report row (`status: "pending"`), and schedules the AI recommendation generation on QStash. One-shot: a second call for the same access is rejected.
+Returns the active form with every question in display order, plus the caller's own attempt if they already submitted one.
 
-**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
-
-**Request**
-
-```json
-{
-  "project_id": "V7rdgcYkq9PHQZkwvoA-F",
-  "ai_use_frequency": "weekly",
-  "ai_tools_used": ["ChatGPT", "Copilot"],
-  "ai_limitations": ["Kadang jawabannya kurang akurat"],
-  "output_review": "sometimes",
-  "use_cases": ["Menulis email", "Ringkasan rapat"],
-  "team_adoption": "personal",
-  "concrete_example": "Meringkas notulen rapat mingguan jadi poin aksi",
-  "model_selection": "rarely",
-  "multimodal_use": "never",
-  "workflow_reuse": "sometimes",
-  "prompt_comfort": "basic",
-  "prompt_iteration": "sometimes",
-  "refine_scenario": "manual",
-  "professional_attitude": "supportive",
-  "data_safety_check": "often",
-  "publish_unchecked": "rarely",
-  "biggest_challenge": "Sulit menyusun prompt yang detail untuk kasus yang kompleks",
-  "training_expectation": "Ingin bisa membuat automation sederhana dengan AI",
-  "motivation": "curious"
-}
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `project_id` | string | yes | |
-| `ai_use_frequency` | string | yes | `never` / `tried` / `weekly` / `daily` / `intensive`. |
-| `ai_tools_used` | array of string | yes | At least 1 item. |
-| `ai_limitations` | array of string | yes | At least 1 item. |
-| `output_review` | string | yes | `no_check` / `sometimes` / `always` / `cross_check` / `no_use`. |
-| `use_cases` | array of string | yes | At least 1 item. |
-| `team_adoption` | string | yes | `none` / `personal` / `pilot` / `policy` / `integrated`. |
-| `concrete_example` | string | no | Max 255 chars. |
-| `model_selection` | string | yes | `never` / `rarely` / `sometimes` / `often` / `always`. |
-| `multimodal_use` | string | yes | Same 5 values as `model_selection`. |
-| `workflow_reuse` | string | yes | Same 5 values as `model_selection`. |
-| `prompt_comfort` | string | yes | `none` / `basic` / `decent` / `structured` / `expert`. |
-| `prompt_iteration` | string | yes | Same 5 values as `model_selection`. |
-| `refine_scenario` | string | yes | `targeted` / `switch_tool` / `manual` / `restart`. |
-| `professional_attitude` | string | yes | `too_risky` / `cautious` / `neutral` / `supportive` / `essential`. |
-| `data_safety_check` | string | yes | Same 5 values as `model_selection`. |
-| `publish_unchecked` | string | yes | Same 5 values as `model_selection`. |
-| `biggest_challenge` | string | yes | |
-| `training_expectation` | string | yes | |
-| `motivation` | string | yes | `mandatory` / `curious` / `tentative` / `ready` / `eager`. |
-
-**Response** — `201 Created`
-
-```json
-{
-  "success": true,
-  "code": 201,
-  "status": "CREATED",
-  "message": "pre-assessment submitted successfully",
-  "data": { "id": 4 }
-}
-```
-
-`id` is the new `lms_pre_assessments.id` — pass it to nothing, since `score`/`recommendations` below are scoped by the caller's own access, not by this id. Scheduling the QStash job (`POST /api/v1/pre-assessment/report-callback` below) happens synchronously inside this call, but a publish failure doesn't fail the submission — if `QSTASH_TOKEN`/`APP_BASE_URL` aren't configured, or the publish call itself fails, `create` still succeeds and the report row is simply left `status: "pending"` with nothing queued.
-
-**Errors**
-
-All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
-
-| Code | Status | Message | When |
-|---|---|---|---|
-| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
-| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
-| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
-| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
-| 400 | `BAD_REQUEST` | `aiUseFrequency: must not be null` | missing `ai_use_frequency` field (same pattern for every other required field — Java property name + `must not be null`/`must not be blank`/`must not be empty`) |
-| 400 | `BAD_REQUEST` | `ai_use_frequency: 'NEVER' is not one of [never, tried, weekly, daily, intensive]` | an enum field carries a value outside its set — casing included, the labels are lowercase. Note this one reports the **JSON** field name, unlike the `@Valid` messages above, which report the Java property name |
-| 400 | `BAD_REQUEST` | `ai_tools_used: wrong type or missing` | a field's JSON type doesn't match the DTO, e.g. a string where a list is expected |
-| 400 | `BAD_REQUEST` | `Malformed JSON request body` | the body isn't parseable JSON at all |
-| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
-| 400 | `BAD_REQUEST` | `Pre-assessment already submitted.` | the caller's access already has an `lms_pre_assessments` row |
-
-### `POST {base_url}/api/v1/pre-assessment/score`
-
-Returns the caller's raw pre-assessment answers plus a deterministic pillar score computed on the fly from those answers — 6 pillars (`ai_foundation`, `prompting`, `tool_fluency`, `use_case_diversity`, `ai_habit`, `agentic`), each scored 1–5. This is pure arithmetic over the stored answers, not AI — it's always available immediately after `create`, unlike `recommendations` below.
-
-**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
-
-**Request**
-
-```json
-{
-  "project_id": "V7rdgcYkq9PHQZkwvoA-F"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `project_id` | string | yes |
-
-**Response** — `200 OK`, caller has submitted a pre-assessment:
-
-```json
-{
-  "success": true,
-  "code": 200,
-  "status": "OK",
-  "message": "pre-assessment score retrieved successfully",
-  "data": {
-    "pre_assessment": {
-      "id": 4,
-      "access_id": "N2rTk8pXQz1LBcVmoA9-K",
-      "ai_use_frequency": "weekly",
-      "ai_tools_used": ["ChatGPT", "Copilot"],
-      "ai_limitations": ["Kadang jawabannya kurang akurat"],
-      "output_review": "sometimes",
-      "use_cases": ["Menulis email", "Ringkasan rapat"],
-      "team_adoption": "personal",
-      "concrete_example": "Meringkas notulen rapat mingguan jadi poin aksi",
-      "model_selection": "rarely",
-      "multimodal_use": "never",
-      "workflow_reuse": "sometimes",
-      "prompt_comfort": "basic",
-      "prompt_iteration": "sometimes",
-      "refine_scenario": "manual",
-      "professional_attitude": "supportive",
-      "data_safety_check": "often",
-      "publish_unchecked": "rarely",
-      "biggest_challenge": "Sulit menyusun prompt yang detail untuk kasus yang kompleks",
-      "training_expectation": "Ingin bisa membuat automation sederhana dengan AI",
-      "motivation": "curious",
-      "created_at": "2026-08-28T10:00:00Z"
-    },
-    "report": {
-      "pillars": [
-        { "key": "ai_foundation", "label": "AI Foundation", "score": 2.7 },
-        { "key": "prompting", "label": "Prompting", "score": 2.5 },
-        { "key": "tool_fluency", "label": "Tool Fluency", "score": 1.8 },
-        { "key": "use_case_diversity", "label": "Use Case", "score": 1.9 },
-        { "key": "ai_habit", "label": "AI Habit", "score": 2.5 },
-        { "key": "agentic", "label": "Agentic", "score": 1.8 }
-      ],
-      "avg": 2.2,
-      "strongest": { "key": "ai_foundation", "label": "AI Foundation" },
-      "weakest": { "key": "tool_fluency", "label": "Tool Fluency" },
-      "quote": "Meringkas notulen rapat mingguan jadi poin aksi"
-    }
-  }
-}
-```
-
-**Response** — `200 OK`, caller hasn't submitted a pre-assessment yet:
-
-```json
-{
-  "success": true,
-  "code": 200,
-  "status": "OK",
-  "message": "pre-assessment score retrieved successfully",
-  "data": { "pre_assessment": null, "report": null }
-}
-```
-
-`pre_assessment` is every column of the caller's `lms_pre_assessments` row verbatim (`access_id` is their own `lms_accesses.id` in this project). `report.strongest`/`weakest` are the pillar with the highest/lowest score (ties keep whichever pillar is listed first in `pillars`). `report.quote` is `concrete_example` if the student filled it in, else `biggest_challenge`, else a fixed fallback sentence. `report.avg` is the mean of all 6 pillar scores, rounded to 1 decimal — same rounding as every individual pillar score.
-
-**Errors**
-
-All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
-
-| Code | Status | Message | When |
-|---|---|---|---|
-| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
-| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
-| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
-| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
-| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
-
-### `POST {base_url}/api/v1/pre-assessment/recommendations`
-
-Returns the status and content of the AI-generated recommendation list for the caller's pre-assessment — separate from `score` above so the client can render the deterministic pillars immediately and poll only this endpoint while the AI generation finishes in the background.
-
-**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
-
-**Request**
-
-```json
-{
-  "project_id": "V7rdgcYkq9PHQZkwvoA-F"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `project_id` | string | yes |
-
-**Response** — `200 OK`, still generating:
-
-```json
-{
-  "success": true,
-  "code": 200,
-  "status": "OK",
-  "message": "pre-assessment recommendations retrieved successfully",
-  "data": {
-    "status": "pending",
-    "recommendations": null,
-    "error_message": null,
-    "generated_at": null
-  }
-}
-```
-
-**Response** — `200 OK`, done:
-
-```json
-{
-  "success": true,
-  "code": 200,
-  "status": "OK",
-  "message": "pre-assessment recommendations retrieved successfully",
-  "data": {
-    "status": "completed",
-    "recommendations": {
-      "time_saved_label": "~4,9 Jam/minggu",
-      "items": [
-        {
-          "source": "Menyusun notulen rapat mingguan",
-          "title": "Otomasi ringkasan rapat jadi poin aksi",
-          "impact": "Tinggi",
-          "speed": "~70% lebih cepat",
-          "description": "Rekam rapat lalu minta AI merangkum jadi poin aksi terstruktur.",
-          "lessons": ["Prompting Dasar", "Ringkasan & Ekstraksi"]
-        }
-      ]
-    },
-    "error_message": null,
-    "generated_at": "2026-08-28T10:02:30Z"
-  }
-}
-```
-
-`status` is `pending` (queued, not started), `processing`, `completed`, or `failed`. `recommendations` is the raw JSON blob written by the AI worker — its shape (`time_saved_label` + `items[]` in the example above) isn't validated or reshaped by this endpoint, it's passed through verbatim from `lms_pre_assessment_reports.recommendations`. If the caller has no pre-assessment at all yet, this still returns `status: "pending"` (matching a freshly-seeded report row) rather than an error, so the client can render the same "waiting" state either way. `error_message` is only set when `status = "failed"`.
-
-**Errors**
-
-All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
-
-| Code | Status | Message | When |
-|---|---|---|---|
-| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
-| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
-| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
-| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
-| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
-
-### `POST {base_url}/api/v1/pre-assessment/recommendations/regenerate`
-
-Puts the caller's AI recommendations back in the generation queue, so a report that failed (or never ran) can recover.
-
-**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
+**Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google` or `auth/login/password`.
 
 **Request**
 
@@ -287,72 +27,211 @@ Puts the caller's AI recommendations back in the generation queue, so a report t
   "success": true,
   "code": 200,
   "status": "OK",
-  "message": "pre-assessment recommendations regeneration queued",
-  "data": { "status": "pending", "recommendations": null, "error_message": null, "generated_at": null }
+  "message": "pre-assessment questions retrieved successfully",
+  "data": {
+    "form": { "id": 1, "code": "A", "name": "Pre-Assessment AI Proficiency (Form A)", "duration_minutes": 30 },
+    "attempt": null,
+    "items": [
+      {
+        "id": 15,
+        "item_code": "R1",
+        "section": "scenario",
+        "type": "single_choice",
+        "question": "AI menulis \"Menurut riset McKinsey 2024, 73% perusahaan sudah memakai AI\", lengkap dengan link. ...",
+        "options": [
+          { "id": 61, "text": "Buka sumbernya dan pastikan angka, tahun, dan konteks surveinya memang sesuai sebelum dipakai" },
+          { "id": 62, "text": "Minta AI mengutip kalimat persis dari sumber itu, lalu tampilkan kutipan tersebut di slide" }
+        ]
+      },
+      { "id": 25, "item_code": "C1", "section": "practice", "type": "text", "question": "Pilih satu tugas rutin ...", "options": [] }
+    ]
+  }
 }
 ```
 
-`data` has the same shape as `recommendations`, already in its `pending` state, so a client can swap it in and resume polling `recommendations`. The report is reset to `pending`, its old `recommendations`/`error_message`/`generated_at` are cleared, and the same QStash job `create` sends is published again. Regenerating is allowed in two cases:
+`section` is `profile` (context, not scored), `scenario` (multiple choice, scored), `practice` (a written prompt, graded by an LLM in `score`), or `behaviour` (a frequency scale plus one written example). A `text` item has an empty `options` list and takes a free-text answer. Only `scenario` options are shuffled, per caller and per question, so a reload shows the same order. `Saya tidak tahu` on knowledge questions always stays last, and scale and profile options keep their natural order. Nothing that gives the key away is returned: no credit, domain, CFTE level, or critical-item marker. `attempt` is `null` until the caller submits. After that it's `{ "id", "status", "submitted_at" }`, where `status` is `submitted` until the first `score` call turns it into `scored`.
 
-- the report is `failed`, and at least a minute has passed since it last changed (a light rate limit against hammering the button);
-- the report has been stuck in `pending` or `processing` for more than 5 minutes, which means the job never arrived or died mid-run.
+**Errors**
 
-A `completed` report can't be regenerated.
+All error responses share the shape `{ "success": false, "code", "status", "message" }` (no `data`).
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` | no `Authorization` header, or it doesn't start with `Bearer ` |
+| 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
+| 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
+| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
+| 404 | `NOT_FOUND` | `No active pre-assessment form` | no `lms_pa_forms` row is `active` |
+
+```json
+{
+  "success": false,
+  "code": 404,
+  "status": "NOT_FOUND",
+  "message": "No active pre-assessment form"
+}
+```
+
+### `POST {base_url}/api/v1/pre-assessment/submit`
+
+Submits every answer of the form in one call and creates the caller's attempt with `status: "submitted"`. One-shot: a second call is rejected.
+
+**Authorization:** `Bearer <jwt>`.
+
+**Request**
+
+```json
+{
+  "project_id": "V7rdgcYkq9PHQZkwvoA-F",
+  "form_id": 1,
+  "answers": [
+    { "item_id": 15, "option_id": 61 },
+    { "item_id": 25, "text": "Untuk direksi: ringkas notulen rapat ini jadi 5 poin keputusan ..." }
+  ]
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `project_id` | string | yes | |
+| `form_id` | integer | yes | `data.form.id` from `questions`. |
+| `answers` | array | yes | Exactly one entry per question of the form. |
+| `answers[].item_id` | integer | yes | |
+| `answers[].option_id` | integer | for `single_choice` | Must be one of that question's own options. |
+| `answers[].text` | string | for `text` | Not blank, max 4000 chars, stored trimmed. |
+
+**Response** — `201 Created`
+
+```json
+{
+  "success": true,
+  "code": 201,
+  "status": "CREATED",
+  "message": "pre-assessment answers submitted successfully",
+  "data": { "attempt_id": 1, "status": "submitted" }
+}
+```
+
+Each multiple-choice answer stores the chosen option's credit at submit time. Choosing an option flagged `shadow_ai` (a personal AI account, question A2) sets the attempt's `is_shadow_ai`. Nothing is graded or scored here. That happens in `score`.
 
 **Errors**
 
 | Code | Status | Message | When |
 |---|---|---|---|
-| 401 | `UNAUTHORIZED` | `Missing or invalid authorization header` / `Invalid or expired token` / `Session not found or already ended` | same session checks as `recommendations` |
-| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` field |
+| 401 | `UNAUTHORIZED` | same three messages as `questions` | session checks |
+| 400 | `BAD_REQUEST` | `formId: must not be null` / `answers: must not be empty` / `answers[0].itemId: must not be null` / `answers[0].text: size must be between 0 and 4000` | request field validation |
+| 400 | `BAD_REQUEST` | `answers: wrong type or missing` | `answers` isn't a JSON array |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
-| 404 | `NOT_FOUND` | `Pre-assessment belum diisi` | the caller hasn't submitted a pre-assessment in this project |
-| 400 | `BAD_REQUEST` | `Rekomendasi sudah selesai dibuat` | the report is already `completed` |
-| 400 | `BAD_REQUEST` | `Rekomendasi sedang dibuat, mohon tunggu sebentar` | the report is `pending`/`processing` and changed within the last 5 minutes |
-| 400 | `BAD_REQUEST` | `Tunggu sebentar sebelum mencoba lagi` | the report is `failed` but changed within the last minute |
+| 404 | `NOT_FOUND` | `Pre-assessment form not found` | `form_id` doesn't exist or its form is no longer `active` |
+| 400 | `BAD_REQUEST` | `Pre-assessment already submitted.` | the caller already has an attempt |
+| 400 | `BAD_REQUEST` | `Question 999 is not part of this form` | an `item_id` belongs to another form or doesn't exist |
+| 400 | `BAD_REQUEST` | `Question F1 is answered more than once` | the same `item_id` appears twice |
+| 400 | `BAD_REQUEST` | `Question F1 needs one of its own options` | a `single_choice` answer has no `option_id`, has an option of another question, or also carries `text` |
+| 400 | `BAD_REQUEST` | `Question C1 needs a text answer` | a `text` answer is blank or carries an `option_id` |
+| 400 | `BAD_REQUEST` | `Every question must be answered, missing: A1, C1` | one or more questions have no answer |
 
 ```json
 {
   "success": false,
   "code": 400,
   "status": "BAD_REQUEST",
-  "message": "Rekomendasi sedang dibuat, mohon tunggu sebentar",
-  "data": null
+  "message": "Every question must be answered, missing: A1, C1"
 }
 ```
 
-### `POST {base_url}/api/v1/pre-assessment/report-callback` (internal)
+### `POST {base_url}/api/v1/pre-assessment/score`
 
-Not a student-facing endpoint. This is the callback `create` schedules via QStash (`QSTASH_TOKEN`/`APP_BASE_URL` env vars, same mechanism as `quizzes/auto-submit`) to actually generate the AI recommendations: flips the report to `status: "processing"`, calls DeepSeek (`deepseek-chat`, `DEEPSEEK_API_KEY` env var) with the deterministic pillar scores plus the raw answers as context, and asks for 3–5 use-case recommendations constrained to the caller's project curriculum (`lms_chapters.name`). DeepSeek's `json_object` mode guarantees JSON but not its shape, so the reply is rebuilt server-side into exactly `{ time_saved_label, items: [{ source, title, impact, speed, description, lessons[] }] }`: items missing `title` or `description` are dropped (at most 5 are kept), `impact` is forced into `Tinggi`/`Sedang`/`Rendah` (anything else becomes `Sedang`), `lessons` keeps only names that really are chapters of the project, and missing `source`/`speed`/`time_saved_label` become `-`. Only when at least one usable item remains does it write the result back as `status: "completed"` with `recommendations` populated and `generated_at` set. Gated by the same static `SECRET_KEY` bearer token as `POST /api/v1/hello-world` (see `docs/api/auth.md`) rather than a student JWT — QStash is configured to forward that header on delivery.
+Returns the caller's CFTE result, computing it first if the attempt is still `submitted`.
 
-Unlike `quizzes/auto-submit`, a failure here does **not** swallow the error into a 200 response: the report row is written to `status: "failed"` with `error_message` (truncated to 500 chars) *before* the exception is rethrown, so the HTTP response back to QStash is a genuine error status — QStash's own retry policy then reattempts delivery on its usual backoff, which re-flips the row through `processing` again on each attempt. If every retry fails, the student can queue it again with `recommendations/regenerate`.
-
-**Authorization:** `Bearer <SECRET_KEY>`.
+**Authorization:** `Bearer <jwt>`.
 
 **Request**
 
 ```json
-{ "pre_assessment_id": 4 }
+{ "project_id": "V7rdgcYkq9PHQZkwvoA-F" }
 ```
 
 | Field | Type | Required |
 |---|---|---|
-| `pre_assessment_id` | integer | yes |
+| `project_id` | string | yes |
 
-**Response** — `200 OK`, `data` is always `null`.
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "pre-assessment score retrieved successfully",
+  "data": {
+    "attempt_id": 1,
+    "status": "scored",
+    "submitted_at": "2026-10-12T04:25:34.344741Z",
+    "scored_at": "2026-10-12T04:25:36.52717Z",
+    "band": { "band": 5, "name": "Strategic Mastery", "level": 3 },
+    "raw_band": { "band": 5, "name": "Strategic Mastery", "level": 3 },
+    "target_band": { "band": 2, "name": "Basic Proficiency", "level": 1 },
+    "gap": 0,
+    "meets_target": true,
+    "dimensions": { "knowledge": 100, "skills": 93.75, "behaviours": 87.5 },
+    "level_mastery": { "p1": 100, "p2": 100, "p3": 75 },
+    "gates": { "security_passed": true, "behaviour_passed": true },
+    "flags": { "overclaim": false, "shadow_ai": false, "sensitive_data": false },
+    "clusters": [
+      { "code": "understand", "name": "Memahami AI", "score": 100 },
+      { "code": "use", "name": "Memakai AI", "score": 88.46 }
+    ],
+    "domains": [
+      { "code": "foundations", "name": "AI Foundations", "cluster_code": "understand", "score": 100 },
+      { "code": "tools_methods", "name": "AI Tools and Methods", "cluster_code": "use", "score": 82.14 }
+    ],
+    "feedback": [
+      { "item_code": "C1", "text": "Anda sudah menulis prompt yang sangat lengkap: tujuan terukur, sumber input jelas, ..." },
+      { "item_code": "B6", "text": "Anda memberikan contoh spesifik dengan tool ChatGPT, ..." }
+    ]
+  }
+}
+```
+
+`data` is `null` when the caller hasn't submitted yet. The first call after `submit` sends the written answers (C1 prompt, B6 example, with the A3 routine tasks as context) to DeepSeek in one request, which takes a few seconds. It then runs the band engine, stores everything, and flips the attempt to `scored`. Every later call only reads the stored result.
+
+How the numbers come out:
+- **`level_mastery`**: the percentage of credit on CFTE L1, L2, and L3 items (`p1`/`p2`/`p3`). Scenario credit is 1, 0.5, or 0. C1 counts as two virtual items: L1 passes at a rubric total of 6/12, L2 at 9/12.
+- **`dimensions`**: `knowledge` and `skills` average their items × 100. `behaviours` is half the B1–B5 average and half B6.
+- **`raw_band`**: the highest band whose `min_p1`/`min_p2`/`min_p3` in `lms_pa_bands` are all met.
+- **`band`**: the raw band after two gates. A wrong critical item (DA1, R1, E1) or real sensitive data in C1 caps it at 1. From band 3 up, `behaviours` below 50, or B1/B2 below "Kadang", caps it at 2.
+- **Overclaim**: B1 or B2 answered "Sering"/"Selalu" while their paired skill item (R1, DA1) is wrong drops that behaviour to 0.25 and sets `flags.overclaim`.
+- **`target_band`**: one flat target for everyone (`lms_pa_scoring_configs.target_band`, currently 2). `gap` is how many bands short the caller is, never negative.
+- **`clusters`**: item-weighted averages of their domains.
+
+Every threshold comes from the active `lms_pa_scoring_configs` row and its `lms_pa_bands`, not from code. The attempt keeps the `config_id` it was scored with.
 
 **Errors**
 
 | Code | Status | Message | When |
 |---|---|---|---|
-| 401 | `UNAUTHORIZED` | `Bearer token is invalid` | wrong or missing bearer token |
-| 400 | `BAD_REQUEST` | `preAssessmentId: must not be null` | missing `pre_assessment_id` field |
-| 404 | `NOT_FOUND` | `Pre-assessment report not found` | no `lms_pre_assessment_reports` row matches `pre_assessment_id` (shouldn't happen — `create` always seeds one); this lookup happens before the row is flipped to `processing`, so nothing is written on this specific failure |
-| 404 | `NOT_FOUND` | `Pre-assessment not found` / `Access not found` | the `lms_pre_assessments`/`lms_accesses` row disappeared after the report row was seeded (shouldn't happen in practice) — report is written to `status: "failed"` first |
-| 503 | `SERVICE_UNAVAILABLE` | `AI draft generation is not available right now` | `DEEPSEEK_API_KEY` isn't set (the message is shared with the other DeepSeek callers) — report is written to `status: "failed"` first |
-| 502 | `BAD_GATEWAY` | `The AI service failed to generate a draft, please try again` | DeepSeek returned an error or timed out (the message is shared with the other DeepSeek callers) — report is written to `status: "failed"` first |
-| 502 | `BAD_GATEWAY` | `The AI service returned unusable recommendations` | the reply wasn't JSON, or no item had both `title` and `description` — report is written to `status: "failed"` first, with that message in `error_message` |
+| 401 | `UNAUTHORIZED` | same three messages as `questions` | session checks |
+| 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` |
+| 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
+| 404 | `NOT_FOUND` | `No active pre-assessment scoring config` | no `lms_pa_scoring_configs` row is active (shouldn't happen) |
+| 503 | `SERVICE_UNAVAILABLE` | `AI draft generation is not available right now` | `DEEPSEEK_API_KEY` isn't set (the message is shared with the other DeepSeek callers) |
+| 502 | `BAD_GATEWAY` | `The AI service failed to generate a draft, please try again` | DeepSeek returned an error or timed out |
+| 502 | `BAD_GATEWAY` | `The AI service returned an unusable grading` | the reply wasn't JSON, missed an item, or had a score outside its rubric |
+
+A 502/503 leaves the attempt `submitted` with nothing written, so calling `score` again retries the grading.
+
+```json
+{
+  "success": false,
+  "code": 502,
+  "status": "BAD_GATEWAY",
+  "message": "The AI service returned an unusable grading"
+}
+```
 
 ## Known gaps
 
-There's no endpoint yet to list a project's own curriculum chapters as a flat name list outside of this callback — `ChapterRepository.findActiveChapterNames` exists only to feed the AI prompt above, not as a public API.
+AI use-case recommendations are gone with the legacy endpoints and have not been rebuilt on `lms_pa_attempt_reports` yet. The champion and sponsor pre-assessment baselines (`PreAssessmentReportBuilder`) still read the legacy `lms_pre_assessments` table, so they don't show new attempts.
+
+There is no autosave: the whole form is sent at once. Two simultaneous `submit` calls for the same access both pass the duplicate check, and the loser fails on `UNIQUE (access_id)` with a generic 500 instead of the 400 above. Two simultaneous first `score` calls can both pay for a DeepSeek grading. Only one result is stored, because the attempt row is locked while scoring is written.

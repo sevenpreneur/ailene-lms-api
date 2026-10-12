@@ -38,7 +38,7 @@ Returns the caller's XP, current level, and pre-assessment status for one projec
 }
 ```
 
-`xp_count` is the sum of `lms_xp_earnings.xp_earned` for the caller's access in this project (`0` if none earned yet). `current_level_number` is `lms_levels.level_number` for the access's `current_level_id`, or `null` if no level has been set. `has_pre_assessment` is whether an `lms_pre_assessments` row exists for this access.
+`xp_count` is the sum of `lms_xp_earnings.xp_earned` for the caller's access in this project (`0` if none earned yet). `current_level_number` is `lms_levels.level_number` for the access's `current_level_id`, or `null` if no level has been set. `has_pre_assessment` is whether an `lms_pa_attempts` row exists for this access, i.e. whether it has called `pre-assessment/submit`.
 
 **Errors**
 

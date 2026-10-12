@@ -47,22 +47,22 @@ class MalformedBodyTest {
 
     @Test
     void uppercaseEnumValueIsRejectedAsBadRequestNamingTheField() throws Exception {
-        mockMvc.perform(post("/api/v1/pre-assessment/create")
+        mockMvc.perform(post("/api/v1/use-cases/self-create")
                 .header("Authorization", "Bearer token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body("\"NEVER\"")))
+                .content(useCaseBody("\"DAILY\"")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value(
-                        "ai_use_frequency: 'NEVER' is not one of [never, tried, weekly, daily, intensive]"));
+                        "frequency: 'DAILY' is not one of [daily, weekly, monthly, occasionally]"));
     }
 
     @Test
     void lowercaseEnumValueGetsPastTheBindingLayer() throws Exception {
-        mockMvc.perform(post("/api/v1/pre-assessment/create")
+        mockMvc.perform(post("/api/v1/use-cases/self-create")
                 .header("Authorization", "Bearer token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body("\"never\"")))
+                .content(useCaseBody("\"daily\"")))
                 .andExpect(result -> {
                     int code = result.getResponse().getStatus();
                     if (code == 400 && result.getResponse().getContentAsString().contains("is not one of")) {
@@ -73,17 +73,17 @@ class MalformedBodyTest {
 
     @Test
     void wrongJsonTypeIsRejectedAsBadRequest() throws Exception {
-        mockMvc.perform(post("/api/v1/pre-assessment/create")
+        mockMvc.perform(post("/api/v1/pre-assessment/submit")
                 .header("Authorization", "Bearer token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"project_id\":\"" + PROJECT_ID + "\",\"ai_tools_used\":\"not-a-list\"}"))
+                .content("{\"project_id\":\"" + PROJECT_ID + "\",\"form_id\":1,\"answers\":\"not-a-list\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("ai_tools_used: wrong type or missing"));
+                .andExpect(jsonPath("$.message").value("answers: wrong type or missing"));
     }
 
     @Test
     void brokenJsonIsRejectedWithoutLeakingInternals() throws Exception {
-        mockMvc.perform(post("/api/v1/pre-assessment/create")
+        mockMvc.perform(post("/api/v1/pre-assessment/submit")
                 .header("Authorization", "Bearer token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"project_id\": "))
@@ -91,30 +91,20 @@ class MalformedBodyTest {
                 .andExpect(jsonPath("$.message").value("Malformed JSON request body"));
     }
 
-    private static String body(String aiUseFrequency) {
+    private static String useCaseBody(String frequency) {
         return """
                 {
                   "project_id": "%s",
-                  "ai_use_frequency": %s,
-                  "ai_tools_used": ["chatgpt"],
-                  "ai_limitations": ["hallucination"],
-                  "output_review": "no_check",
-                  "use_cases": ["research"],
-                  "team_adoption": "none",
-                  "concrete_example": "example",
-                  "model_selection": "never",
-                  "multimodal_use": "never",
-                  "workflow_reuse": "never",
-                  "prompt_comfort": "none",
-                  "prompt_iteration": "never",
-                  "refine_scenario": "targeted",
-                  "professional_attitude": "neutral",
-                  "data_safety_check": "never",
-                  "publish_unchecked": "never",
-                  "biggest_challenge": "challenge",
-                  "training_expectation": "expectation",
-                  "motivation": "curious"
+                  "name": "Rekap laporan mingguan",
+                  "category_ids": [1],
+                  "outcome_proof": "https://example.com/bukti",
+                  "hours_with_ai": 1,
+                  "hours_without_ai": 3,
+                  "description": "Meringkas laporan penjualan mingguan",
+                  "ai_tool": "ChatGPT",
+                  "frequency": %s,
+                  "type": "data_analysis"
                 }
-                """.formatted(PROJECT_ID, aiUseFrequency);
+                """.formatted(PROJECT_ID, frequency);
     }
 }

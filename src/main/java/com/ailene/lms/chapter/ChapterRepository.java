@@ -52,22 +52,4 @@ public interface ChapterRepository extends JpaRepository<Chapter, Integer> {
             """, nativeQuery = true)
     List<ChapterListProjection> findChapterList(@Param("projectId") String projectId,
             @Param("accessId") String accessId);
-
-    @Query(value = """
-            SELECT c.name
-            FROM lms_chapters c
-            JOIN lms_levels lv ON lv.id = c.level_id
-            JOIN LATERAL (
-              SELECT s.session_date, s.duration_minutes, s.location_name, s.location_url, s.method
-              FROM lms_chapter_sessions s
-              WHERE s.chapter_id = c.id AND s.status = 'active'
-                AND (s.only_group_id IS NULL OR s.only_group_id = (SELECT a.group_id FROM lms_accesses a WHERE a.id = :accessId))
-              ORDER BY (s.only_group_id IS NULL)
-              LIMIT 1
-            ) s ON true
-            WHERE c.project_id = :projectId AND c.status = 'active'
-            ORDER BY c.id ASC
-            """, nativeQuery = true)
-    List<String> findActiveChapterNames(@Param("projectId") String projectId,
-            @Param("accessId") String accessId);
 }
