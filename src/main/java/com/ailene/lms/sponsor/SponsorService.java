@@ -1,9 +1,7 @@
 package com.ailene.lms.sponsor;
 
-import com.ailene.lms.preassessment.PreAssessment;
-import com.ailene.lms.preassessment.PreAssessmentReportBuilder;
-import com.ailene.lms.preassessment.PreAssessmentReportPillar;
-import com.ailene.lms.preassessment.PreAssessmentRepository;
+import com.ailene.lms.preassessment.PreAssessmentBaseline;
+import com.ailene.lms.preassessment.PreAssessmentBaselineReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -42,14 +40,10 @@ public class SponsorService {
     // Program window for the proficiency trend, still a fixed cohort range (no per-project column yet).
     private static final LocalDate PROGRAM_START = LocalDate.of(2026, 6, 26);
     private static final LocalDate PROGRAM_END = LocalDate.of(2026, 8, 26);
-    // Maturity line on the org pillar ranking — the 3.2 threshold from the member report.
-    private static final double PILLAR_TARGET = 3.2;
-    private static final List<String> PILLAR_ORDER = List.of("ai_foundation", "prompting", "tool_fluency",
-            "use_case_diversity", "ai_habit", "agentic");
 
     private final SponsorAccessGuard sponsorAccessGuard;
     private final SponsorRepository sponsorRepository;
-    private final PreAssessmentRepository preAssessmentRepository;
+    private final PreAssessmentBaselineReader baselineReader;
 
     public OrganizationStatsResponse getOrganizationStats(String jwt, SponsorProjectRequest request) {
         String projectId = guard(jwt, request);
@@ -589,88 +583,43 @@ public class SponsorService {
     public PreAssessmentOrganizationResponse getPreAssessmentOrganization(String jwt,
             SponsorProjectRequest request) {
         String projectId = guard(jwt, request);
+        PreAssessmentBaseline baseline = baselineReader.read(projectId, null);
+        List<PreAssessmentBaseline.Member> everyone = baseline.members();
 
-        List<MemberRowProjection> members = sponsorRepository.findMembers(projectId);
-        List<GroupRowProjection> groups = sponsorRepository.findGroups(projectId);
-
-        Map<Integer, Integer> groupByPreAssessment = new HashMap<>();
-        for (PreAssessmentGroupProjection row : sponsorRepository.findPreAssessmentGroups(projectId)) {
-            groupByPreAssessment.put(row.getPreAssessmentId(), row.getGroupId());
+        Map<Integer, List<PreAssessmentBaseline.Member>> byGroup = new LinkedHashMap<>();
+        for (GroupRowProjection group : sponsorRepository.findGroups(projectId)) {
+            byGroup.put(group.getId(), new ArrayList<>());
         }
-
-        Map<Integer, PillarAccumulator> byGroup = new HashMap<>();
-        for (PreAssessment preAssessment : preAssessmentRepository
-                .findAllById(groupByPreAssessment.keySet())) {
-            Integer groupId = groupByPreAssessment.get(preAssessment.getId());
-            if (groupId == null) {
-                continue;
-            }
-            PillarAccumulator acc = byGroup.computeIfAbsent(groupId, key -> new PillarAccumulator());
-            for (PreAssessmentReportPillar pillar : PreAssessmentReportBuilder.build(preAssessment).pillars()) {
-                acc.sums.merge(pillar.key(), pillar.score(), Double::sum);
-            }
-            acc.count++;
-            Instant createdAt = preAssessment.getCreatedAt() == null ? null
-                    : preAssessment.getCreatedAt().toInstant();
-            if (createdAt != null && (acc.measuredAt == null || createdAt.isAfter(acc.measuredAt))) {
-                acc.measuredAt = createdAt;
+        Map<Integer, String> groupNames = new HashMap<>();
+        for (PreAssessmentBaseline.Member member : everyone) {
+            if (member.groupId() != null && byGroup.containsKey(member.groupId())) {
+                byGroup.get(member.groupId()).add(member);
+                groupNames.put(member.groupId(), member.groupName());
             }
         }
 
-        List<DepartmentPillars> departments = new ArrayList<>();
-        for (GroupRowProjection group : groups) {
-            PillarAccumulator acc = byGroup.get(group.getId());
-            if (acc == null) {
-                continue;
-            }
-            List<PillarScore> pillars = PILLAR_ORDER.stream()
-                    .map(key -> new PillarScore(key, round1(acc.sums.getOrDefault(key, 0.0) / acc.count)))
-                    .toList();
-            double avg = round1(pillars.stream().mapToDouble(PillarScore::score).average().orElse(0));
-            int memberCount = (int) members.stream()
-                    .filter(member -> group.getId().equals(member.getGroupId()))
-                    .count();
-
-            departments.add(new DepartmentPillars(group.getId(), group.getName(), memberCount, acc.count,
-                    pct(acc.count, memberCount), pillars, avg));
-        }
-
-        departments = departments.stream()
-                .sorted(Comparator.comparingDouble(DepartmentPillars::avg))
+        // Departments with no learners are dropped; the rest read weakest-first, unmeasured ones last.
+        List<DepartmentBaseline> departments = byGroup.entrySet().stream()
+                .filter(entry -> !entry.getValue().isEmpty())
+                .map(entry -> {
+                    List<PreAssessmentBaseline.Member> group = entry.getValue();
+                    int submitted = (int) group.stream().filter(PreAssessmentBaseline.Member::submitted).count();
+                    return new DepartmentBaseline(entry.getKey(), groupNames.get(entry.getKey()), group.size(),
+                            submitted, (int) group.stream().filter(PreAssessmentBaseline.Member::scored).count(),
+                            PreAssessmentBaseline.pct(submitted, group.size()), baseline.meetsTargetCount(group),
+                            PreAssessmentBaseline.average(group), baseline.averageClusters(group),
+                            baseline.bandCounts(group));
+                })
+                .sorted(Comparator.comparing(DepartmentBaseline::avg, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
-        List<DepartmentPillars> finalDepartments = departments;
-        List<PillarScore> orgPillars = PILLAR_ORDER.stream()
-                .map(key -> new PillarScore(key, round1(finalDepartments.stream()
-                        .mapToDouble(department -> department.pillars().stream()
-                                .filter(pillar -> pillar.key().equals(key))
-                                .mapToDouble(PillarScore::score)
-                                .findFirst()
-                                .orElse(0))
-                        .average()
-                        .orElse(0))))
-                .sorted(Comparator.comparingDouble(PillarScore::score))
-                .toList();
-
-        double orgAvg = round1(departments.stream().mapToDouble(DepartmentPillars::avg).average().orElse(0));
-        int readyCount = (int) departments.stream().filter(d -> d.avg() >= 2.5).count();
-        int developingCount = (int) departments.stream().filter(d -> d.avg() >= 1.5 && d.avg() < 2.5).count();
-        int basicCount = (int) departments.stream().filter(d -> d.avg() < 1.5).count();
-        int gapLargeCount = (int) departments.stream().filter(d -> d.avg() < 2.0).count();
-
-        Instant measuredAt = null;
-        for (DepartmentPillars department : departments) {
-            Instant candidate = byGroup.get(department.id()).measuredAt;
-            if (candidate != null && (measuredAt == null || candidate.isAfter(measuredAt))) {
-                measuredAt = candidate;
-            }
-        }
-
-        return new PreAssessmentOrganizationResponse(departments.size(),
-                departments.stream().mapToInt(DepartmentPillars::memberCount).sum(),
-                departments.stream().mapToInt(DepartmentPillars::completedCount).sum(), measuredAt, PILLAR_TARGET,
-                orgAvg, readyCount, gapLargeCount, departments, orgPillars,
-                new Readiness(readyCount, developingCount, basicCount));
+        return new PreAssessmentOrganizationResponse(departments.size(), everyone.size(),
+                (int) everyone.stream().filter(PreAssessmentBaseline.Member::submitted).count(),
+                (int) everyone.stream().filter(PreAssessmentBaseline.Member::scored).count(),
+                PreAssessmentBaseline.measuredAt(everyone), baseline.targetBand(),
+                baseline.meetsTargetCount(everyone), PreAssessmentBaseline.average(everyone),
+                PreAssessmentBaseline.weakestFirst(baseline.averageClusters(everyone)),
+                baseline.bandCounts(everyone), departments);
     }
 
     private String guard(String jwt, SponsorProjectRequest request) {
@@ -761,11 +710,5 @@ public class SponsorService {
         private double hoursPrevWeek;
         private int submissionCount;
         private final Map<String, Integer> useCaseCounts = new LinkedHashMap<>();
-    }
-
-    private static final class PillarAccumulator {
-        private final Map<String, Double> sums = new HashMap<>();
-        private int count;
-        private Instant measuredAt;
     }
 }

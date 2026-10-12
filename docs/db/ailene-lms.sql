@@ -525,22 +525,27 @@ CREATE TABLE lms_pa_domains (
   name          VARCHAR      NOT NULL
 );
 
-CREATE TABLE lms_pa_forms (
+CREATE TABLE lms_pa_versions (
   id                SERIAL       PRIMARY KEY,
   code              VARCHAR      NOT NULL,
   version           SMALLINT     NOT NULL  DEFAULT 1,
   name              VARCHAR      NOT NULL,
   duration_minutes  SMALLINT     NOT NULL,
-  status            status_enum  NOT NULL  DEFAULT 'inactive',
-  published_at      TIMESTAMPTZ      NULL,
   created_at        TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (code, version)
 );
 
+CREATE TABLE lms_pa_project_versions (
+  project_id  CHAR(21)     PRIMARY KEY,
+  version_id  INTEGER      NOT NULL,
+  created_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE lms_pa_items (
   id                 SERIAL                 PRIMARY KEY,
-  form_id            INTEGER                NOT NULL,
+  version_id         INTEGER                NOT NULL,
   item_code          VARCHAR(10)            NOT NULL,
   section            lms_pa_section_enum    NOT NULL,
   type               lms_pa_item_type_enum  NOT NULL,
@@ -555,8 +560,8 @@ CREATE TABLE lms_pa_items (
   order_index        SMALLINT               NOT NULL  DEFAULT 0,
   created_at         TIMESTAMPTZ            NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at         TIMESTAMPTZ            NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (form_id, item_code),
-  UNIQUE (id, form_id),
+  UNIQUE (version_id, item_code),
+  UNIQUE (id, version_id),
   CHECK (section = 'profile' OR (domain_id IS NOT NULL AND dimension IS NOT NULL)),
   CHECK (grading_config IS NULL OR type = 'text')
 );
@@ -603,7 +608,7 @@ CREATE TABLE lms_pa_bands (
 CREATE TABLE lms_pa_attempts (
   id                     SERIAL                      PRIMARY KEY,
   access_id              CHAR(21)                    NOT NULL,
-  form_id                INTEGER                     NOT NULL,
+  version_id             INTEGER                     NOT NULL,
   config_id              INTEGER                         NULL,
   status                 lms_pa_attempt_status_enum  NOT NULL  DEFAULT 'submitted',
   p1                     NUMERIC(5,2)                    NULL,
@@ -624,13 +629,13 @@ CREATE TABLE lms_pa_attempts (
   scored_at              TIMESTAMPTZ                     NULL,
   updated_at             TIMESTAMPTZ                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (access_id),
-  UNIQUE (id, form_id)
+  UNIQUE (id, version_id)
 );
 
 CREATE TABLE lms_pa_answers (
   attempt_id          INTEGER       NOT NULL,
   item_id             INTEGER       NOT NULL,
-  form_id             INTEGER       NOT NULL,
+  version_id          INTEGER       NOT NULL,
   option_id           INTEGER           NULL,
   text_value          TEXT              NULL,
   credit              NUMERIC(3,2)      NULL  CHECK (credit BETWEEN 0 AND 1),
@@ -793,10 +798,14 @@ ALTER TABLE lms_pre_assessment_reports
 ALTER TABLE lms_pa_domains
   ADD FOREIGN KEY (cluster_id) REFERENCES lms_pa_clusters (id);
 
+ALTER TABLE lms_pa_project_versions
+  ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id),
+  ADD FOREIGN KEY (version_id) REFERENCES lms_pa_versions (id);
+
 ALTER TABLE lms_pa_items
-  ADD FOREIGN KEY (form_id)                    REFERENCES lms_pa_forms (id),
-  ADD FOREIGN KEY (domain_id)                  REFERENCES lms_pa_domains (id),
-  ADD FOREIGN KEY (overclaim_item_id, form_id) REFERENCES lms_pa_items (id, form_id);
+  ADD FOREIGN KEY (version_id)                    REFERENCES lms_pa_versions (id),
+  ADD FOREIGN KEY (domain_id)                     REFERENCES lms_pa_domains (id),
+  ADD FOREIGN KEY (overclaim_item_id, version_id) REFERENCES lms_pa_items (id, version_id);
 
 ALTER TABLE lms_pa_item_options
   ADD FOREIGN KEY (item_id) REFERENCES lms_pa_items (id);
@@ -805,14 +814,14 @@ ALTER TABLE lms_pa_bands
   ADD FOREIGN KEY (config_id) REFERENCES lms_pa_scoring_configs (id);
 
 ALTER TABLE lms_pa_attempts
-  ADD FOREIGN KEY (access_id) REFERENCES lms_accesses (id),
-  ADD FOREIGN KEY (form_id)   REFERENCES lms_pa_forms (id),
-  ADD FOREIGN KEY (config_id) REFERENCES lms_pa_scoring_configs (id);
+  ADD FOREIGN KEY (access_id)  REFERENCES lms_accesses (id),
+  ADD FOREIGN KEY (version_id) REFERENCES lms_pa_versions (id),
+  ADD FOREIGN KEY (config_id)  REFERENCES lms_pa_scoring_configs (id);
 
 ALTER TABLE lms_pa_answers
-  ADD FOREIGN KEY (attempt_id, form_id) REFERENCES lms_pa_attempts (id, form_id),
-  ADD FOREIGN KEY (item_id, form_id)    REFERENCES lms_pa_items (id, form_id),
-  ADD FOREIGN KEY (option_id, item_id)  REFERENCES lms_pa_item_options (id, item_id);
+  ADD FOREIGN KEY (attempt_id, version_id) REFERENCES lms_pa_attempts (id, version_id),
+  ADD FOREIGN KEY (item_id, version_id)    REFERENCES lms_pa_items (id, version_id),
+  ADD FOREIGN KEY (option_id, item_id)     REFERENCES lms_pa_item_options (id, item_id);
 
 ALTER TABLE lms_pa_attempt_domain_scores
   ADD FOREIGN KEY (attempt_id) REFERENCES lms_pa_attempts (id),
@@ -882,11 +891,11 @@ CREATE INDEX idx_lms_use_case_subs_reviewed_by       ON lms_use_case_submissions
 
 -- LMS pre-assessment
 
-CREATE UNIQUE INDEX idx_lms_pa_forms_active           ON lms_pa_forms ((TRUE)) WHERE status = 'active';
 CREATE UNIQUE INDEX idx_lms_pa_scoring_configs_active ON lms_pa_scoring_configs (is_active) WHERE is_active;
+CREATE INDEX idx_lms_pa_project_versions_version_id ON lms_pa_project_versions (version_id);
 CREATE INDEX idx_lms_pa_domains_cluster_id           ON lms_pa_domains (cluster_id);
 CREATE INDEX idx_lms_pa_items_domain_id              ON lms_pa_items (domain_id);
-CREATE INDEX idx_lms_pa_attempts_form_id             ON lms_pa_attempts (form_id);
+CREATE INDEX idx_lms_pa_attempts_version_id          ON lms_pa_attempts (version_id);
 CREATE INDEX idx_lms_pa_attempts_config_id           ON lms_pa_attempts (config_id);
 CREATE INDEX idx_lms_pa_answers_item_id              ON lms_pa_answers (item_id);
 CREATE INDEX idx_lms_pa_answers_option_id            ON lms_pa_answers (option_id);
@@ -998,8 +1007,13 @@ CREATE TRIGGER update_lms_pre_assessment_reports_updated_at_trigger
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
-CREATE TRIGGER update_lms_pa_forms_updated_at_trigger
-  BEFORE UPDATE ON lms_pa_forms
+CREATE TRIGGER update_lms_pa_versions_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_versions
+  FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_lms_pa_project_versions_updated_at_trigger
+  BEFORE UPDATE ON lms_pa_project_versions
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 

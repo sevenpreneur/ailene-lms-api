@@ -194,27 +194,19 @@ public interface SponsorRepository extends JpaRepository<Access, String> {
             @Param("take") int take);
 
     @Query(value = """
-            SELECT pa.created_at AS at,
+            SELECT pa.submitted_at AS at,
                    u.full_name AS actor,
                    g.name AS groupName,
                    u.job_title AS subject,
                    FALSE AS accepted
-            FROM lms_pre_assessments pa
+            FROM lms_pa_attempts pa
             JOIN lms_accesses a ON a.id = pa.access_id
             JOIN lms_users u ON u.id = a.user_id
             LEFT JOIN lms_groups g ON g.id = a.group_id AND g.project_id = a.project_id
             WHERE a.project_id = :projectId
-            ORDER BY pa.created_at DESC
+            ORDER BY pa.submitted_at DESC
             LIMIT :take
             """, nativeQuery = true)
     List<ActivityRowProjection> findRecentPreAssessments(@Param("projectId") String projectId,
             @Param("take") int take);
-
-    @Query(value = """
-            SELECT pa.id AS preAssessmentId, a.group_id AS groupId
-            FROM lms_pre_assessments pa
-            JOIN lms_accesses a ON a.id = pa.access_id
-            WHERE a.project_id = :projectId AND a.group_id IS NOT NULL
-            """, nativeQuery = true)
-    List<PreAssessmentGroupProjection> findPreAssessmentGroups(@Param("projectId") String projectId);
 }

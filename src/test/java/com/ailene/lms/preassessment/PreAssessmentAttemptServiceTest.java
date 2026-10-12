@@ -3,6 +3,7 @@ package com.ailene.lms.preassessment;
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
 import com.ailene.lms.common.exception.BadRequestException;
+import com.ailene.lms.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,8 +54,8 @@ class PreAssessmentAttemptServiceTest {
 
     private PreAssessmentAttemptService service;
 
-    private record FormRow(Integer getId, String getCode, String getName, Integer getDurationMinutes,
-            String getStatus) implements PreAssessmentFormProjection {
+    private record VersionRow(Integer getId, String getCode, Integer getVersion, String getName,
+            Integer getDurationMinutes) implements PreAssessmentVersionProjection {
     }
 
     private record ItemRow(Integer getId, String getItemCode, String getSection, String getType, String getQuestion,
@@ -92,9 +93,8 @@ class PreAssessmentAttemptServiceTest {
         access.setProjectId(PROJECT_ID);
         when(accessRepository.findByUserIdAndProjectId(USER_ID, PROJECT_ID)).thenReturn(Optional.of(access));
 
-        FormRow form = new FormRow(1, "A", "Form A", 30, "active");
-        when(attemptRepository.findForm(1)).thenReturn(Optional.of(form));
-        when(attemptRepository.findActiveForm()).thenReturn(Optional.of(form));
+        VersionRow version = new VersionRow(1, "A", 1, "Form A", 30);
+        when(attemptRepository.findProjectVersion(PROJECT_ID)).thenReturn(Optional.of(version));
         when(attemptRepository.findByAccessId(ACCESS_ID)).thenReturn(Optional.empty());
         when(attemptRepository.findItems(1)).thenReturn(List.of(
                 new ItemRow(1, "A2", "profile", "single_choice", "Tools kantor?", null, null, null, false, false, null,
@@ -119,14 +119,14 @@ class PreAssessmentAttemptServiceTest {
     }
 
     private static PreAssessmentSubmitRequest request(PreAssessmentSubmitRequest.Answer... answers) {
-        return new PreAssessmentSubmitRequest(PROJECT_ID, 1, List.of(answers));
+        return new PreAssessmentSubmitRequest(PROJECT_ID, List.of(answers));
     }
 
     private static PreAssessmentAttempt attempt(PreAssessmentAttemptStatus status) {
         PreAssessmentAttempt attempt = new PreAssessmentAttempt();
         attempt.setId(42);
         attempt.setAccessId(ACCESS_ID);
-        attempt.setFormId(1);
+        attempt.setVersionId(1);
         attempt.setStatus(status);
         return attempt;
     }
@@ -204,6 +204,15 @@ class PreAssessmentAttemptServiceTest {
         assertThat(second.items().get(1).options()).extracting(PreAssessmentQuestionsResponse.Option::id)
                 .isEqualTo(scenario);
         assertThat(first.items().get(2).options()).isEmpty();
+    }
+
+    @Test
+    void questions_projectWithoutVersion_isNotFound() {
+        when(attemptRepository.findProjectVersion(PROJECT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getQuestions(USER_ID, new PreAssessmentProjectRequest(PROJECT_ID)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("No pre-assessment is set for this project");
     }
 
     @Test

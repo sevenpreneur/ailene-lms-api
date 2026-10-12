@@ -20,26 +20,16 @@ public interface PreAssessmentAttemptRepository extends JpaRepository<PreAssessm
     Optional<PreAssessmentAttempt> findByIdForUpdate(@Param("id") Integer id);
 
     @Query(value = """
-            SELECT f.id AS id,
-                   f.code AS code,
-                   f.name AS name,
-                   f.duration_minutes::int AS durationMinutes,
-                   f.status::text AS status
-            FROM lms_pa_forms f
-            WHERE f.status = 'active'
+            SELECT v.id AS id,
+                   v.code AS code,
+                   v.version::int AS version,
+                   v.name AS name,
+                   v.duration_minutes::int AS durationMinutes
+            FROM lms_pa_project_versions pv
+            JOIN lms_pa_versions v ON v.id = pv.version_id
+            WHERE pv.project_id = :projectId
             """, nativeQuery = true)
-    Optional<PreAssessmentFormProjection> findActiveForm();
-
-    @Query(value = """
-            SELECT f.id AS id,
-                   f.code AS code,
-                   f.name AS name,
-                   f.duration_minutes::int AS durationMinutes,
-                   f.status::text AS status
-            FROM lms_pa_forms f
-            WHERE f.id = :formId
-            """, nativeQuery = true)
-    Optional<PreAssessmentFormProjection> findForm(@Param("formId") Integer formId);
+    Optional<PreAssessmentVersionProjection> findProjectVersion(@Param("projectId") String projectId);
 
     @Query(value = """
             SELECT i.id AS id,
@@ -55,10 +45,10 @@ public interface PreAssessmentAttemptRepository extends JpaRepository<PreAssessm
                    i.overclaim_item_id AS overclaimItemId,
                    i.grading_config::text AS gradingConfig
             FROM lms_pa_items i
-            WHERE i.form_id = :formId
+            WHERE i.version_id = :versionId
             ORDER BY i.order_index, i.id
             """, nativeQuery = true)
-    List<PreAssessmentItemProjection> findItems(@Param("formId") Integer formId);
+    List<PreAssessmentItemProjection> findItems(@Param("versionId") Integer versionId);
 
     @Query(value = """
             SELECT o.id AS id,
@@ -69,19 +59,19 @@ public interface PreAssessmentAttemptRepository extends JpaRepository<PreAssessm
                    o.flag AS flag
             FROM lms_pa_item_options o
             JOIN lms_pa_items i ON i.id = o.item_id
-            WHERE i.form_id = :formId
+            WHERE i.version_id = :versionId
             ORDER BY o.item_id, o.order_index, o.id
             """, nativeQuery = true)
-    List<PreAssessmentOptionProjection> findOptions(@Param("formId") Integer formId);
+    List<PreAssessmentOptionProjection> findOptions(@Param("versionId") Integer versionId);
 
     @Modifying
     @Query(value = """
-            INSERT INTO lms_pa_answers (attempt_id, item_id, form_id, option_id, text_value, credit)
-            VALUES (:attemptId, :itemId, :formId, CAST(:optionId AS INTEGER), CAST(:textValue AS TEXT),
+            INSERT INTO lms_pa_answers (attempt_id, item_id, version_id, option_id, text_value, credit)
+            VALUES (:attemptId, :itemId, :versionId, CAST(:optionId AS INTEGER), CAST(:textValue AS TEXT),
                     CAST(:credit AS NUMERIC))
             """, nativeQuery = true)
     int insertAnswer(@Param("attemptId") Integer attemptId, @Param("itemId") Integer itemId,
-            @Param("formId") Integer formId, @Param("optionId") Integer optionId,
+            @Param("versionId") Integer versionId, @Param("optionId") Integer optionId,
             @Param("textValue") String textValue, @Param("credit") BigDecimal credit);
 
     @Query(value = """

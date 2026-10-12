@@ -1,14 +1,14 @@
 package com.ailene.lms.preassessment;
 
-public interface PreAssessmentFormProjection {
+public interface PreAssessmentVersionProjection {
 
     Integer getId();
 
     String getCode();
 
+    Integer getVersion();
+
     String getName();
 
     Integer getDurationMinutes();
-
-    String getStatus();
 }

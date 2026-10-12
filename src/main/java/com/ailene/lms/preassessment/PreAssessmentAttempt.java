@@ -30,8 +30,8 @@ public class PreAssessmentAttempt {
     @Column(name = "access_id", nullable = false, unique = true, length = 21)
     private String accessId;
 
-    @Column(name = "form_id", nullable = false)
-    private Integer formId;
+    @Column(name = "version_id", nullable = false)
+    private Integer versionId;
 
     @Column(name = "config_id")
     private Integer configId;

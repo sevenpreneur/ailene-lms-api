@@ -8,8 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-public record PreAssessmentSubmitRequest(@NotBlank String projectId, @NotNull Integer formId,
-        @NotEmpty List<@Valid @NotNull Answer> answers) {
+public record PreAssessmentSubmitRequest(@NotBlank String projectId, @NotEmpty List<@Valid @NotNull Answer> answers) {
 
     public record Answer(@NotNull Integer itemId, Integer optionId, @Size(max = 4000) String text) {
     }

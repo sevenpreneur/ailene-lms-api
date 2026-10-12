@@ -76,7 +76,7 @@ class MalformedBodyTest {
         mockMvc.perform(post("/api/v1/pre-assessment/submit")
                 .header("Authorization", "Bearer token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"project_id\":\"" + PROJECT_ID + "\",\"form_id\":1,\"answers\":\"not-a-list\"}"))
+                .content("{\"project_id\":\"" + PROJECT_ID + "\",\"answers\":\"not-a-list\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("answers: wrong type or missing"));
     }

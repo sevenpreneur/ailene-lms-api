@@ -1,6 +1,6 @@
 # Champion
 
-Endpoints for a **champion** — the person who coaches one department's learners. Three groups: `/api/v1/champion/*` for the team roster, one member's profile, the team competency baseline and the periodic report; `/api/v1/champion/assignments/*` for AI-drafted library items; `/api/v1/champion/prompts/*` and `/api/v1/champion/use-cases/*` for assigning work and reviewing what comes back. Library browsing (`/api/v1/prompts`, `/api/v1/use-cases`), the category list (`/api/v1/categories`) and coaching notes (`/api/v1/coaching-notes/*`) already live in their own docs and are shared with other roles.
+Endpoints for a **champion** — the person who coaches one department's learners. Three groups: `/api/v1/champion/*` for the team roster, one member's profile, the team pre-assessment baseline and the periodic report; `/api/v1/champion/assignments/*` for AI-drafted library items; `/api/v1/champion/prompts/*` and `/api/v1/champion/use-cases/*` for assigning work and reviewing what comes back. Library browsing (`/api/v1/prompts`, `/api/v1/use-cases`), the category list (`/api/v1/categories`) and coaching notes (`/api/v1/coaching-notes/*`) already live in their own docs and are shared with other roles.
 
 Every endpoint takes a `project_id` and requires the caller's `lms_accesses` row on that project to have `role = 'champion'` — anyone else gets `403`.
 
@@ -198,43 +198,45 @@ Returns the team's competency baseline from the pre-assessment, per member and a
   "status": "OK",
   "message": "team pre-assessment retrieved successfully",
   "data": {
-    "department_count": 1,
+    "group_id": 1,
+    "group_name": "Human Capital",
     "total_members": 9,
-    "completed_count": 7,
-    "measured_at": "2026-07-02T09:15:00Z",
-    "target": 3.2,
-    "team_avg": 2.1,
-    "ready_count": 2,
-    "gap_large_count": 3,
-    "departments": [
-      {
-        "id": 1,
-        "name": "Human Capital",
-        "member_count": 9,
-        "completed_count": 7,
-        "completion_percent": 78,
-        "avg": 2.1,
-        "pillars": [{ "key": "ai_foundation", "score": 2.4 }],
-        "members": [
-          {
-            "access_id": "V7rdgcYkq9PHQZkwvoA-F",
-            "name": "Sari Dewi",
-            "avatar": null,
-            "avg": 1.4,
-            "pillars": [{ "key": "ai_foundation", "score": 1.6 }],
-            "weakest_key": "agentic",
-            "is_me": false
-          }
-        ]
-      }
+    "submitted_count": 7,
+    "scored_count": 6,
+    "measured_at": "2026-10-12T04:25:34.344741Z",
+    "target_band": { "band": 2, "name": "Basic Proficiency", "level": 1 },
+    "meets_target_count": 4,
+    "team_avg": 58.4,
+    "team_clusters": [
+      { "code": "lead", "name": "Memimpin adopsi", "score": 41.7 },
+      { "code": "use", "name": "Memakai AI", "score": 66.2 }
     ],
-    "team_pillars": [{ "key": "agentic", "score": 1.6 }],
-    "readiness": { "ready": 2, "developing": 3, "basic": 2 }
+    "bands": [
+      { "band": 0, "name": "Unmeasured baseline", "level": 0, "count": 0 },
+      { "band": 1, "name": "Awareness", "level": 0, "count": 2 }
+    ],
+    "members": [
+      {
+        "access_id": "V7rdgcYkq9PHQZkwvoA-F",
+        "name": "Sari Dewi",
+        "avatar": null,
+        "status": "scored",
+        "band": { "band": 1, "name": "Awareness", "level": 0 },
+        "avg": 38.5,
+        "meets_target": false,
+        "clusters": [
+          { "code": "understand", "name": "Memahami AI", "score": 50 },
+          { "code": "use", "name": "Memakai AI", "score": 27 }
+        ],
+        "weakest_code": "use",
+        "is_me": false
+      }
+    ]
   }
 }
 ```
 
-Pillar scores reuse the same deterministic scoring as `POST /api/v1/pre-assessment/score`. Unlike the sponsor's org view, this one is **member-grained** — a champion coaches people, not departments — so `members` is sorted weakest-first and every aggregate (`team_avg`, `team_pillars`, `readiness`) is a mean over members rather than over departments. `departments` always holds exactly one entry, the champion's own group, so the array shape matches the sponsor endpoint. Unlike the rest of this doc, where "team" excludes the caller, the baseline covers **everyone in the group except sponsors**: the caller and any other champions count toward `total_members`/`member_count` (the `completion_percent` denominator) and appear in `members` once they have submitted. `is_me` marks the caller's own row. Sponsors are left out of both the count and the list, because they are org-wide observers who only sit in a group because `group_id` is required. `team_pillars` is sorted ascending so the biggest gap reads first. Readiness tiers key off each member's average: `ready` ≥ 2.5, `developing` 1.5–2.5, `basic` < 1.5; `gap_large_count` counts members below 2.0. With no submitted pre-assessments you get the same shape with zeroes and an empty `departments`.
+Read from `lms_pa_attempts` and `lms_pa_attempt_domain_scores`, so it shows exactly what each member's own `pre-assessment/score` shows. The baseline covers **everyone in the group except sponsors**: the caller and other champions are in `members` too (`is_me` marks the caller), while sponsors are left out because they are org-wide observers who only sit in a group because `group_id` is required. Every member is listed, with `status` `not_started`, `submitted` (still waiting on its first `score` call) or `scored`; only `scored` members carry a `band`, `avg` and cluster scores, and only they count toward `team_avg`, `team_clusters`, `bands` and `meets_target_count`. A cluster score is the item-weighted mean of its domains, `avg` is the plain mean of the member's cluster scores, and `team_clusters` averages members and is sorted weakest-first (a cluster nobody has a score in has `score: null` and sorts last). `members` is sorted scored first (lowest band, then lowest `avg`), then `submitted`, then `not_started`. `target_band` and the band names come from the active `lms_pa_scoring_configs`, and `bands` lists every configured band, including empty ones. `measured_at` is the latest `submitted_at`, or `null` when nobody has submitted.
 
 **Errors** — same shape and cases as `members` above (minus the `group_id` assertion).
 

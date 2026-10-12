@@ -3,12 +3,12 @@ package com.ailene.lms.preassessment;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-public record PreAssessmentQuestionsResponse(Form form, Attempt attempt, List<Item> items) {
+public record PreAssessmentQuestionsResponse(Version version, Attempt attempt, List<Item> items) {
 
-    public record Form(Integer id, String code, String name, Integer durationMinutes) {
+    public record Version(Integer id, String code, Integer version, String name, Integer durationMinutes) {
 
-        public static Form from(PreAssessmentFormProjection p) {
-            return new Form(p.getId(), p.getCode(), p.getName(), p.getDurationMinutes());
+        public static Version from(PreAssessmentVersionProjection p) {
+            return new Version(p.getId(), p.getCode(), p.getVersion(), p.getName(), p.getDurationMinutes());
         }
     }
 

@@ -1,12 +1,12 @@
 # Pre-Assessment
 
-Endpoints for a student's one-time CFTE AIPF pre-assessment. The questions live in the database (`lms_pa_forms`/`lms_pa_items`/`lms_pa_item_options`), and only one form is ever `active`. Each access gets exactly one attempt (`lms_pa_attempts`, `UNIQUE (access_id)`) with one `lms_pa_answers` row per question. `submit` only stores answers. `score` grades the written answers with DeepSeek, computes the band the first time it's called, and stores the result. The older hardcoded questionnaire (`lms_pre_assessments`) has no endpoints left: `create`, `recommendations`, `recommendations/regenerate`, and `report-callback` were removed.
+Endpoints for a student's one-time CFTE AIPF pre-assessment. The questions live in the database as versioned item banks (`lms_pa_versions`/`lms_pa_items`/`lms_pa_item_options`). Each project is pointed at exactly one version through `lms_pa_project_versions`, and several projects can share a version, so their results stay comparable. Each access gets exactly one attempt (`lms_pa_attempts`, `UNIQUE (access_id)`) with one `lms_pa_answers` row per question. `submit` only stores answers. `score` grades the written answers with DeepSeek, computes the band the first time it's called, and stores the result. The older hardcoded questionnaire (`lms_pre_assessments`) has no endpoints left: `create`, `recommendations`, `recommendations/regenerate`, and `report-callback` were removed.
 
 ## Endpoints
 
 ### `POST {base_url}/api/v1/pre-assessment/questions`
 
-Returns the active form with every question in display order, plus the caller's own attempt if they already submitted one.
+Returns the pre-assessment version assigned to the caller's project, with every question in display order, plus the caller's own attempt if they already submitted one.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google` or `auth/login/password`.
 
@@ -29,7 +29,7 @@ Returns the active form with every question in display order, plus the caller's 
   "status": "OK",
   "message": "pre-assessment questions retrieved successfully",
   "data": {
-    "form": { "id": 1, "code": "A", "name": "Pre-Assessment AI Proficiency (Form A)", "duration_minutes": 30 },
+    "version": { "id": 1, "code": "A", "version": 1, "name": "Pre-Assessment AI Proficiency (Form A)", "duration_minutes": 30 },
     "attempt": null,
     "items": [
       {
@@ -62,20 +62,20 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `projectId: must not be blank` | missing/empty `project_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
-| 404 | `NOT_FOUND` | `No active pre-assessment form` | no `lms_pa_forms` row is `active` |
+| 404 | `NOT_FOUND` | `No pre-assessment is set for this project` | the project has no `lms_pa_project_versions` row |
 
 ```json
 {
   "success": false,
   "code": 404,
   "status": "NOT_FOUND",
-  "message": "No active pre-assessment form"
+  "message": "No pre-assessment is set for this project"
 }
 ```
 
 ### `POST {base_url}/api/v1/pre-assessment/submit`
 
-Submits every answer of the form in one call and creates the caller's attempt with `status: "submitted"`. One-shot: a second call is rejected.
+Submits every answer in one call and creates the caller's attempt with `status: "submitted"`, against the version assigned to the project. One-shot: a second call is rejected.
 
 **Authorization:** `Bearer <jwt>`.
 
@@ -84,7 +84,6 @@ Submits every answer of the form in one call and creates the caller's attempt wi
 ```json
 {
   "project_id": "V7rdgcYkq9PHQZkwvoA-F",
-  "form_id": 1,
   "answers": [
     { "item_id": 15, "option_id": 61 },
     { "item_id": 25, "text": "Untuk direksi: ringkas notulen rapat ini jadi 5 poin keputusan ..." }
@@ -95,8 +94,7 @@ Submits every answer of the form in one call and creates the caller's attempt wi
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `project_id` | string | yes | |
-| `form_id` | integer | yes | `data.form.id` from `questions`. |
-| `answers` | array | yes | Exactly one entry per question of the form. |
+| `answers` | array | yes | Exactly one entry per question of the project's version (the `items` from `questions`). |
 | `answers[].item_id` | integer | yes | |
 | `answers[].option_id` | integer | for `single_choice` | Must be one of that question's own options. |
 | `answers[].text` | string | for `text` | Not blank, max 4000 chars, stored trimmed. |
@@ -120,12 +118,12 @@ Each multiple-choice answer stores the chosen option's credit at submit time. Ch
 | Code | Status | Message | When |
 |---|---|---|---|
 | 401 | `UNAUTHORIZED` | same three messages as `questions` | session checks |
-| 400 | `BAD_REQUEST` | `formId: must not be null` / `answers: must not be empty` / `answers[0].itemId: must not be null` / `answers[0].text: size must be between 0 and 4000` | request field validation |
+| 400 | `BAD_REQUEST` | `answers: must not be empty` / `answers[0].itemId: must not be null` / `answers[0].text: size must be between 0 and 4000` | request field validation |
 | 400 | `BAD_REQUEST` | `answers: wrong type or missing` | `answers` isn't a JSON array |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for `project_id` |
-| 404 | `NOT_FOUND` | `Pre-assessment form not found` | `form_id` doesn't exist or its form is no longer `active` |
+| 404 | `NOT_FOUND` | `No pre-assessment is set for this project` | the project has no `lms_pa_project_versions` row |
 | 400 | `BAD_REQUEST` | `Pre-assessment already submitted.` | the caller already has an attempt |
-| 400 | `BAD_REQUEST` | `Question 999 is not part of this form` | an `item_id` belongs to another form or doesn't exist |
+| 400 | `BAD_REQUEST` | `Question 999 is not part of this pre-assessment` | an `item_id` belongs to another version or doesn't exist |
 | 400 | `BAD_REQUEST` | `Question F1 is answered more than once` | the same `item_id` appears twice |
 | 400 | `BAD_REQUEST` | `Question F1 needs one of its own options` | a `single_choice` answer has no `option_id`, has an option of another question, or also carries `text` |
 | 400 | `BAD_REQUEST` | `Question C1 needs a text answer` | a `text` answer is blank or carries an `option_id` |
@@ -232,6 +230,6 @@ A 502/503 leaves the attempt `submitted` with nothing written, so calling `score
 
 ## Known gaps
 
-AI use-case recommendations are gone with the legacy endpoints and have not been rebuilt on `lms_pa_attempt_reports` yet. The champion and sponsor pre-assessment baselines (`PreAssessmentReportBuilder`) still read the legacy `lms_pre_assessments` table, so they don't show new attempts.
+AI use-case recommendations are gone with the legacy endpoints and have not been rebuilt on `lms_pa_attempt_reports` yet. The champion and sponsor baselines (`champion/pre-assessment-team`, `sponsor/pre-assessment-organization`) read these same attempts through `PreAssessmentBaselineReader`. The legacy `lms_pre_assessments` table is no longer read or written by anything.
 
-There is no autosave: the whole form is sent at once. Two simultaneous `submit` calls for the same access both pass the duplicate check, and the loser fails on `UNIQUE (access_id)` with a generic 500 instead of the 400 above. Two simultaneous first `score` calls can both pay for a DeepSeek grading. Only one result is stored, because the attempt row is locked while scoring is written.
+There is no autosave: every answer is sent at once. Changing a project's version after someone submitted leaves their attempt on the old version, which is intended. Two simultaneous `submit` calls for the same access both pass the duplicate check, and the loser fails on `UNIQUE (access_id)` with a generic 500 instead of the 400 above. Two simultaneous first `score` calls can both pay for a DeepSeek grading. Only one result is stored, because the attempt row is locked while scoring is written.

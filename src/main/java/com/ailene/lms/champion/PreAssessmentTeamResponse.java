@@ -1,9 +1,12 @@
 package com.ailene.lms.champion;
 
+import com.ailene.lms.preassessment.PreAssessmentBaseline;
+
 import java.time.Instant;
 import java.util.List;
 
-public record PreAssessmentTeamResponse(int departmentCount, int totalMembers, int completedCount,
-        Instant measuredAt, double target, double teamAvg, int readyCount, int gapLargeCount,
-        List<TeamDepartmentBaseline> departments, List<TeamPillarScore> teamPillars, TeamReadiness readiness) {
+public record PreAssessmentTeamResponse(Integer groupId, String groupName, int totalMembers, int submittedCount,
+        int scoredCount, Instant measuredAt, PreAssessmentBaseline.Band targetBand, int meetsTargetCount,
+        Double teamAvg, List<PreAssessmentBaseline.Cluster> teamClusters,
+        List<PreAssessmentBaseline.BandCount> bands, List<TeamMemberBaseline> members) {
 }

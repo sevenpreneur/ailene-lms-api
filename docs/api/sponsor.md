@@ -386,7 +386,7 @@ Returns the "Kinerja per Departemen" table: headcount, average level, most-submi
 
 ### `POST {base_url}/api/v1/sponsor/pre-assessment-organization`
 
-Returns the organization's competency baseline from the pre-assessment: six pillar scores averaged per department, then across departments, plus readiness tiers.
+Returns the organization's competency baseline from the pre-assessment: bands and cluster scores per department and across the organization.
 
 **Authorization:** `Bearer <jwt>`.
 
@@ -403,30 +403,42 @@ Returns the organization's competency baseline from the pre-assessment: six pill
   "data": {
     "department_count": 5,
     "total_members": 44,
-    "completed_count": 31,
-    "measured_at": "2026-07-02T09:15:00Z",
-    "target": 3.2,
-    "org_avg": 2.1,
-    "ready_count": 2,
-    "gap_large_count": 1,
+    "submitted_count": 31,
+    "scored_count": 30,
+    "measured_at": "2026-10-12T04:25:34.344741Z",
+    "target_band": { "band": 2, "name": "Basic Proficiency", "level": 1 },
+    "meets_target_count": 18,
+    "org_avg": 61.2,
+    "org_clusters": [
+      { "code": "lead", "name": "Memimpin adopsi", "score": 44.1 },
+      { "code": "use", "name": "Memakai AI", "score": 63.8 }
+    ],
+    "bands": [
+      { "band": 0, "name": "Unmeasured baseline", "level": 0, "count": 1 },
+      { "band": 1, "name": "Awareness", "level": 0, "count": 11 }
+    ],
     "departments": [
       {
         "id": 3,
         "name": "Finance",
         "member_count": 9,
-        "completed_count": 7,
+        "submitted_count": 7,
+        "scored_count": 7,
         "completion_percent": 78,
-        "pillars": [{ "key": "ai_foundation", "score": 2.4 }],
-        "avg": 2.1
+        "meets_target_count": 3,
+        "avg": 52.6,
+        "clusters": [
+          { "code": "understand", "name": "Memahami AI", "score": 60 },
+          { "code": "use", "name": "Memakai AI", "score": 48.5 }
+        ],
+        "bands": [{ "band": 1, "name": "Awareness", "level": 0, "count": 4 }]
       }
-    ],
-    "org_pillars": [{ "key": "agentic", "score": 1.6 }],
-    "readiness": { "ready": 2, "developing": 2, "basic": 1 }
+    ]
   }
 }
 ```
 
-Pillar scores reuse the same deterministic scoring as `POST /api/v1/pre-assessment/score` (`PreAssessmentReportBuilder`), so a department's numbers are the plain mean of its members' pillar scores. Only departments with at least one submitted pre-assessment appear, sorted by `avg` ascending (weakest first), and `org_pillars` is sorted the same way so the biggest gap reads first. `target` is the 3.2 maturity line from the member-facing report. Readiness tiers key off each department's `avg`: `ready` ≥ 2.5, `developing` 1.5–2.5, `basic` < 1.5; `gap_large_count` counts departments below 2.0.
+Read from `lms_pa_attempts` and `lms_pa_attempt_domain_scores`, the same numbers each member sees from `pre-assessment/score`. Sponsors are left out of every count. Every department with at least one learner appears; `completion_percent` is `submitted_count` over `member_count`. Scores, `bands` and `meets_target_count` cover `scored` attempts only (a `submitted` one is still waiting on its first `score` call). A member's average is the plain mean of their cluster scores (each the item-weighted mean of its domains); a department's `avg` and `clusters`, and `org_avg`/`org_clusters`, average **members**, not departments, so a large department weighs more. `departments` is sorted by `avg` ascending with unmeasured ones (`avg: null`) last, and `org_clusters` is sorted weakest-first. `target_band` and the band names come from the active `lms_pa_scoring_configs`, and `bands` lists every configured band, including empty ones.
 
 **Errors** — same shape and cases as `organization-stats` above.
 

@@ -41,15 +41,14 @@ public class PreAssessmentAttemptService {
 
     public PreAssessmentQuestionsResponse getQuestions(UUID userId, PreAssessmentProjectRequest request) {
         Access access = findAccess(userId, request.projectId());
-        PreAssessmentFormProjection form = attemptRepository.findActiveForm()
-                .orElseThrow(() -> new ResourceNotFoundException("No active pre-assessment form"));
+        PreAssessmentVersionProjection version = findProjectVersion(access);
 
         Map<Integer, List<PreAssessmentOptionProjection>> optionsByItem = attemptRepository
-                .findOptions(form.getId()).stream()
+                .findOptions(version.getId()).stream()
                 .collect(Collectors.groupingBy(PreAssessmentOptionProjection::getItemId));
 
         List<PreAssessmentQuestionsResponse.Item> items = new ArrayList<>();
-        for (PreAssessmentItemProjection item : attemptRepository.findItems(form.getId())) {
+        for (PreAssessmentItemProjection item : attemptRepository.findItems(version.getId())) {
             List<PreAssessmentOptionProjection> options = optionsByItem.getOrDefault(item.getId(), List.of());
             if (SHUFFLED_SECTION.equals(item.getSection())) {
                 options = shuffle(options, access.getId(), item.getId());
@@ -63,30 +62,28 @@ public class PreAssessmentAttemptService {
         PreAssessmentQuestionsResponse.Attempt attempt = attemptRepository.findByAccessId(access.getId())
                 .map(PreAssessmentQuestionsResponse.Attempt::from)
                 .orElse(null);
-        return new PreAssessmentQuestionsResponse(PreAssessmentQuestionsResponse.Form.from(form), attempt, items);
+        return new PreAssessmentQuestionsResponse(PreAssessmentQuestionsResponse.Version.from(version), attempt, items);
     }
 
     @Transactional
     public PreAssessmentSubmitResponse submit(UUID userId, PreAssessmentSubmitRequest request) {
         Access access = findAccess(userId, request.projectId());
-        PreAssessmentFormProjection form = attemptRepository.findForm(request.formId())
-                .filter(f -> "active".equals(f.getStatus()))
-                .orElseThrow(() -> new ResourceNotFoundException("Pre-assessment form not found"));
+        PreAssessmentVersionProjection version = findProjectVersion(access);
 
         if (attemptRepository.findByAccessId(access.getId()).isPresent()) {
             throw new BadRequestException("Pre-assessment already submitted.");
         }
 
         Map<Integer, PreAssessmentItemProjection> items = new LinkedHashMap<>();
-        attemptRepository.findItems(form.getId()).forEach(i -> items.put(i.getId(), i));
+        attemptRepository.findItems(version.getId()).forEach(i -> items.put(i.getId(), i));
         Map<Integer, PreAssessmentOptionProjection> options = new HashMap<>();
-        attemptRepository.findOptions(form.getId()).forEach(o -> options.put(o.getId(), o));
+        attemptRepository.findOptions(version.getId()).forEach(o -> options.put(o.getId(), o));
 
         Map<Integer, PreAssessmentSubmitRequest.Answer> answers = new LinkedHashMap<>();
         for (PreAssessmentSubmitRequest.Answer answer : request.answers()) {
             PreAssessmentItemProjection item = items.get(answer.itemId());
             if (item == null) {
-                throw new BadRequestException("Question " + answer.itemId() + " is not part of this form");
+                throw new BadRequestException("Question " + answer.itemId() + " is not part of this pre-assessment");
             }
             if (answers.put(answer.itemId(), answer) != null) {
                 throw new BadRequestException("Question " + item.getItemCode() + " is answered more than once");
@@ -107,7 +104,7 @@ public class PreAssessmentAttemptService {
 
         PreAssessmentAttempt attempt = new PreAssessmentAttempt();
         attempt.setAccessId(access.getId());
-        attempt.setFormId(form.getId());
+        attempt.setVersionId(version.getId());
         attempt.setStatus(PreAssessmentAttemptStatus.submitted);
         attempt.setIsShadowAi(shadowAi);
         attempt.setSubmittedAt(OffsetDateTime.now());
@@ -115,7 +112,7 @@ public class PreAssessmentAttemptService {
 
         for (PreAssessmentSubmitRequest.Answer answer : answers.values()) {
             PreAssessmentOptionProjection option = answer.optionId() == null ? null : options.get(answer.optionId());
-            attemptRepository.insertAnswer(attemptId, answer.itemId(), form.getId(), answer.optionId(),
+            attemptRepository.insertAnswer(attemptId, answer.itemId(), version.getId(), answer.optionId(),
                     answer.optionId() == null ? answer.text().strip() : null,
                     option == null ? null : option.getCredit());
         }
@@ -131,7 +128,7 @@ public class PreAssessmentAttemptService {
             return null;
         }
 
-        List<PreAssessmentItemProjection> items = attemptRepository.findItems(attempt.getFormId());
+        List<PreAssessmentItemProjection> items = attemptRepository.findItems(attempt.getVersionId());
         if (attempt.getStatus() == PreAssessmentAttemptStatus.submitted) {
             scoreAttempt(attempt, items);
             attempt = attemptRepository.findById(attempt.getId())
@@ -258,6 +255,11 @@ public class PreAssessmentAttemptService {
     private Map<Integer, PreAssessmentAnswerProjection> answersByItem(Integer attemptId) {
         return attemptRepository.findAnswers(attemptId).stream()
                 .collect(Collectors.toMap(PreAssessmentAnswerProjection::getItemId, Function.identity()));
+    }
+
+    private PreAssessmentVersionProjection findProjectVersion(Access access) {
+        return attemptRepository.findProjectVersion(access.getProjectId())
+                .orElseThrow(() -> new ResourceNotFoundException("No pre-assessment is set for this project"));
     }
 
     private Access findAccess(UUID userId, String projectId) {
