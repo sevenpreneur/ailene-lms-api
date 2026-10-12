@@ -3,12 +3,15 @@ package com.ailene.lms.auth;
 import com.ailene.lms.common.exception.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+// Native image only keeps Jackson-bound types it can see; RestClient.body(X.class) targets must be registered explicitly.
 @Component
+@RegisterReflectionForBinding(GoogleUserInfo.class)
 public class GoogleTokenVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleTokenVerifier.class);

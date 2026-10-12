@@ -4,6 +4,7 @@ import com.ailene.lms.common.exception.BadGatewayException;
 import com.ailene.lms.common.exception.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -35,6 +36,7 @@ public class DeepSeekClient {
     }
 
     // json_object mode only guarantees valid JSON, not a shape: the prompt must say "json" and show an example.
+    @RegisterReflectionForBinding(DeepSeekChatResponse.class)
     public String createJsonCompletion(String systemPrompt, String userPrompt, int maxTokens, double temperature) {
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("DeepSeek call skipped: DEEPSEEK_API_KEY is not set");
