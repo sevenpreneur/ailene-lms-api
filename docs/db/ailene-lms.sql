@@ -54,71 +54,6 @@ CREATE TYPE lms_use_case_type_enum AS ENUM (
   'other'
 );
 
--- Enumeration for the lms_pre_assessments table
-
-CREATE TYPE lms_pa_ai_use_freq_enum AS ENUM (
-  'never',
-  'tried',
-  'weekly',
-  'daily',
-  'intensive'
-);
-
-CREATE TYPE lms_pa_output_review_enum AS ENUM (
-  'no_check',
-  'sometimes',
-  'always',
-  'cross_check',
-  'no_use'
-);
-
-CREATE TYPE lms_pa_team_adoption_enum AS ENUM (
-  'none',
-  'personal',
-  'pilot',
-  'policy',
-  'integrated'
-);
-
-CREATE TYPE lms_pa_frequency_enum AS ENUM (
-  'never',
-  'rarely',
-  'sometimes',
-  'often',
-  'always'
-);
-
-CREATE TYPE lms_pa_prompt_skill_enum AS ENUM (
-  'none',
-  'basic',
-  'decent',
-  'structured',
-  'expert'
-);
-
-CREATE TYPE lms_pa_refine_scenario_enum AS ENUM (
-  'targeted',
-  'switch_tool',
-  'manual',
-  'restart'
-);
-
-CREATE TYPE lms_pa_attitude_enum AS ENUM (
-  'too_risky',
-  'cautious',
-  'neutral',
-  'supportive',
-  'essential'
-);
-
-CREATE TYPE lms_pa_motivation_enum AS ENUM (
-  'mandatory',
-  'curious',
-  'tentative',
-  'ready',
-  'eager'
-);
-
 -- Enumeration for the lms_pa_* tables
 
 CREATE TYPE lms_pa_section_enum AS ENUM (
@@ -474,42 +409,6 @@ CREATE TABLE lms_xp_earnings (
 
 -- LMS pre-assessment
 
-CREATE TABLE lms_pre_assessments (
-  id                      SERIAL                          PRIMARY KEY,
-  access_id               CHAR(21)                        NOT NULL  UNIQUE,
-  ai_use_frequency        lms_pa_ai_use_freq_enum          NOT NULL,
-  ai_tools_used           TEXT[]                               NULL,
-  ai_limitations          TEXT[]                               NULL,
-  output_review           lms_pa_output_review_enum       NOT NULL,
-  use_cases               TEXT[]                               NULL,
-  team_adoption           lms_pa_team_adoption_enum       NOT NULL,
-  concrete_example        VARCHAR                              NULL,
-  model_selection         lms_pa_frequency_enum           NOT NULL,
-  multimodal_use          lms_pa_frequency_enum           NOT NULL,
-  workflow_reuse          lms_pa_frequency_enum           NOT NULL,
-  prompt_comfort          lms_pa_prompt_skill_enum        NOT NULL,
-  prompt_iteration        lms_pa_frequency_enum           NOT NULL,
-  refine_scenario         lms_pa_refine_scenario_enum     NOT NULL,
-  professional_attitude   lms_pa_attitude_enum            NOT NULL,
-  data_safety_check       lms_pa_frequency_enum           NOT NULL,
-  publish_unchecked       lms_pa_frequency_enum           NOT NULL,
-  biggest_challenge       TEXT                            NOT NULL,
-  training_expectation    TEXT                            NOT NULL,
-  motivation              lms_pa_motivation_enum          NOT NULL,
-  created_at              TIMESTAMPTZ                     NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE lms_pre_assessment_reports (
-  id                  SERIAL       PRIMARY KEY,
-  pre_assessment_id   INTEGER      NOT NULL  UNIQUE,
-  status              VARCHAR      NOT NULL  DEFAULT 'pending',
-  recommendations     JSONB            NULL,
-  error_message       TEXT             NULL,
-  queued_at           TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  generated_at        TIMESTAMPTZ      NULL,
-  updated_at          TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE lms_pa_clusters (
   id           SMALLSERIAL  PRIMARY KEY,
   code         VARCHAR      NOT NULL  UNIQUE,
@@ -658,17 +557,6 @@ CREATE TABLE lms_pa_attempt_domain_scores (
   PRIMARY KEY (attempt_id, domain_id)
 );
 
-CREATE TABLE lms_pa_attempt_reports (
-  id               SERIAL       PRIMARY KEY,
-  attempt_id       INTEGER      NOT NULL  UNIQUE,
-  status           VARCHAR      NOT NULL  DEFAULT 'pending',
-  recommendations  JSONB            NULL,
-  error_message    TEXT             NULL,
-  queued_at        TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-  generated_at     TIMESTAMPTZ      NULL,
-  updated_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Miscellaneous
 
 CREATE TABLE lms_announcement (
@@ -789,12 +677,6 @@ ALTER TABLE lms_xp_earnings
 
 -- LMS pre-assessment
 
-ALTER TABLE lms_pre_assessments
-  ADD FOREIGN KEY (access_id) REFERENCES lms_accesses (id);
-
-ALTER TABLE lms_pre_assessment_reports
-  ADD FOREIGN KEY (pre_assessment_id) REFERENCES lms_pre_assessments (id);
-
 ALTER TABLE lms_pa_domains
   ADD FOREIGN KEY (cluster_id) REFERENCES lms_pa_clusters (id);
 
@@ -826,9 +708,6 @@ ALTER TABLE lms_pa_answers
 ALTER TABLE lms_pa_attempt_domain_scores
   ADD FOREIGN KEY (attempt_id) REFERENCES lms_pa_attempts (id),
   ADD FOREIGN KEY (domain_id)  REFERENCES lms_pa_domains (id);
-
-ALTER TABLE lms_pa_attempt_reports
-  ADD FOREIGN KEY (attempt_id) REFERENCES lms_pa_attempts (id);
 
 -- LMS misc
 
@@ -1002,11 +881,6 @@ CREATE TRIGGER update_lms_use_case_submissions_updated_at_trigger
 
 -- LMS pre-assessment
 
-CREATE TRIGGER update_lms_pre_assessment_reports_updated_at_trigger
-  BEFORE UPDATE ON lms_pre_assessment_reports
-  FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at();
-
 CREATE TRIGGER update_lms_pa_versions_updated_at_trigger
   BEFORE UPDATE ON lms_pa_versions
   FOR EACH ROW
@@ -1029,11 +903,6 @@ CREATE TRIGGER update_lms_pa_attempts_updated_at_trigger
 
 CREATE TRIGGER update_lms_pa_answers_updated_at_trigger
   BEFORE UPDATE ON lms_pa_answers
-  FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at();
-
-CREATE TRIGGER update_lms_pa_attempt_reports_updated_at_trigger
-  BEFORE UPDATE ON lms_pa_attempt_reports
   FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
