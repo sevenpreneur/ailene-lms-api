@@ -121,7 +121,7 @@ Same shape and cases as `levels` above (missing/invalid auth, expired session, b
 
 ### `POST {base_url}/api/v1/learnings/task`
 
-Returns a chapter's active quizzes, videos, and materials, each ordered by `order_index` ascending.
+Returns a chapter's active quizzes, videos, and materials, each ordered by `order_index` ascending, plus the chapter's pre-test, post-test and survey state.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
 
@@ -181,12 +181,43 @@ Returns a chapter's active quizzes, videos, and materials, each ordered by `orde
         "order_index": 1,
         "completed": false
       }
-    ]
+    ],
+    "pre_test": {
+      "id": 11,
+      "kind": "pre_test",
+      "name": "Pre-test — Fondasi AI",
+      "description": null,
+      "question_count": 5,
+      "submitted": true,
+      "score": 40,
+      "submitted_at": "2026-06-26T01:40:00Z",
+      "available": true,
+      "locked_reason": null
+    },
+    "post_test": {
+      "id": 12,
+      "kind": "post_test",
+      "name": "Post-test — Fondasi AI",
+      "description": null,
+      "question_count": 5,
+      "submitted": false,
+      "score": null,
+      "submitted_at": null,
+      "available": false,
+      "locked_reason": "materials_incomplete"
+    },
+    "survey": {
+      "available": true,
+      "submitted": false,
+      "submitted_at": null
+    }
   }
 }
 ```
 
 `xp_reward` on a quiz is the sum of its questions' `xp_reward`; on a video/material it's that row's own column. `xp_earned` (quizzes and videos only — omitted for materials) comes from `lms_xp_earnings` for the caller's access (`0` if not earned yet). For quizzes, `best_score`/`attempts` are derived from the caller's completed `lms_quiz_submissions` (`best_score` is `null` with zero attempts). `active_attempt_started_at` is that quiz's non-finalized `lms_quiz_submissions.started_at` for the caller (`null` if there's no draft in progress — the client shows "Mulai Quiz"; a timestamp means one's in progress — the client shows "Lanjutkan Quiz" and derives the remaining time itself from `started_at` plus the quiz's 20-minute limit, same limit `POST /api/v1/quizzes/attempt` uses, see `docs/api/quizzes.md`). For videos/materials, `completed` reflects `lms_video_completions`/`lms_material_completions`. Materials omit `content`/`file_url`/`image_url` here — this is a list view, not the material's full body (see `docs/api/materials.md`). `project_id` isn't part of the request — it's resolved internally from `chapter_id` via the chapter's level.
+
+`pre_test`/`post_test` are `null` when the chapter has no active test of that kind; otherwise `available`/`locked_reason` follow the same rules as `POST /api/v1/chapter-tests/details` (see `docs/api/chapter-tests.md`), and `score` is `null` until submitted or for an essay-only test. `survey.available` is `true` once the caller's session for this chapter has started (see `docs/api/chapter-surveys.md`). None of the three count toward `total_tasks`/`done_tasks` in `chapters`, nor toward any champion/sponsor completion figure.
 
 **Errors**
 

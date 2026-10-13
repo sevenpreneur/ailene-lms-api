@@ -7,6 +7,8 @@ import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
 import com.ailene.lms.chapter.ChapterListProjection;
 import com.ailene.lms.chapter.ChapterRepository;
+import com.ailene.lms.chaptertest.ChapterTestService;
+import com.ailene.lms.chaptertest.ChapterTestTasks;
 import com.ailene.lms.common.AssignedByUser;
 import com.ailene.lms.common.Status;
 import com.ailene.lms.common.TimeUtils;
@@ -20,6 +22,7 @@ import com.ailene.lms.prompt.PromptCategoryProjection;
 import com.ailene.lms.prompt.PromptRepository;
 import com.ailene.lms.quiz.QuizFocusProjection;
 import com.ailene.lms.quiz.QuizRepository;
+import com.ailene.lms.survey.ChapterSurveyService;
 import com.ailene.lms.usecase.UseCaseAssignedProjection;
 import com.ailene.lms.usecase.UseCaseCategoryProjection;
 import com.ailene.lms.usecase.UseCaseRepository;
@@ -49,6 +52,8 @@ public class LearningsService {
     private final MaterialRepository materialRepository;
     private final PromptRepository promptRepository;
     private final UseCaseRepository useCaseRepository;
+    private final ChapterTestService chapterTestService;
+    private final ChapterSurveyService chapterSurveyService;
 
     public LearningsResponse getTasks(String jwt, LearningsRequest request) {
         UUID userId = authService.resolveUserId(jwt);
@@ -67,7 +72,10 @@ public class LearningsService {
                 .map(MaterialTaskItem::from)
                 .toList();
 
-        return new LearningsResponse(quizzes, videos, materials);
+        ChapterTestTasks tests = chapterTestService.findTasks(request.chapterId(), access.getId());
+
+        return new LearningsResponse(quizzes, videos, materials, tests.preTest(), tests.postTest(),
+                chapterSurveyService.findStatus(request.chapterId(), access.getId()));
     }
 
     public List<ChapterListItem> getChapters(String jwt, ChapterListRequest request) {
