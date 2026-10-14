@@ -1,6 +1,6 @@
 # Chapter surveys
 
-A short reaction survey (Kirkpatrick level 1) at the end of each chapter: three 1–5 ratings (overall satisfaction, relevance to the caller's work, and how well the trainer delivered the session) plus an optional comment, stored in `lms_chapter_surveys`, one row per access per chapter. The question wording lives in the client; the API stores the three numbers. Each row records the `lms_chapter_sessions` sitting the caller attended (the group-specific one if there is one, else the all-groups one), so `trainer_rating` can be read per session and therefore per trainer without joining the identity service's `trainers` table here. The survey opens once that session's `session_date` has passed. Its state also shows up in `POST /api/v1/learnings/task` as `survey` (see `docs/api/learnings.md`). There is no aggregate/report endpoint yet.
+A short reaction survey (Kirkpatrick level 1) at the end of each chapter: three 1–5 ratings (overall satisfaction, relevance to the caller's work, and how well the trainer delivered the session) plus an optional comment, stored in `lms_chapter_surveys`, one row per access per chapter. The question wording lives in the client; the API stores the three numbers. Each row records the `lms_chapter_sessions` sitting the caller attended (the group-specific one if there is one, else the all-groups one), so `trainer_rating` can be read per session and therefore per trainer without joining the identity service's `trainers` table here. The survey opens once the chapter is unlocked for the caller: that session's `session_date` has passed and it isn't admin-locked (see Chapter lock in `docs/api/learnings.md`). Its state also shows up in `POST /api/v1/learnings/task` as `survey` (see `docs/api/learnings.md`). There is no aggregate/report endpoint yet.
 
 ## Endpoints
 
@@ -39,7 +39,7 @@ Returns whether the caller can answer a chapter's survey yet, and their answer i
 }
 ```
 
-`available` is `true` once `session_date` has passed. `response` is `null` until the caller submits, then has the same shape as the `submit` response below.
+`available` is always `true` here, because a locked chapter answers `403` instead; it is kept so the shape matches `survey` in `learnings/task`, where it is `false` while the chapter is locked. `response` is `null` until the caller submits, then has the same shape as the `submit` response below.
 
 **Errors**
 
@@ -51,8 +51,10 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `chapterId: must not be null` | missing `chapter_id` |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the chapter's level is above the caller's current level |
-| 404 | `NOT_FOUND` | `Chapter not found` | no such chapter, or it has no active session for the caller's group |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 404 | `NOT_FOUND` | `Chapter not found` | no `lms_chapters` row matches `chapter_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the chapter's project |
 
 Example error response (`404 Not Found`):
@@ -114,11 +116,10 @@ A blank `comment` is stored as `null`. Answers can't be edited after submitting.
 
 **Errors**
 
-Same auth, `403` level lock and `404` cases as `details` above, plus:
+Same auth, `403` chapter lock and `404` cases as `details` above, plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
 | 400 | `BAD_REQUEST` | `satisfaction: must be less than or equal to 5` | a rating outside 1–5 (same for `relevance`/`trainerRating`, and `must not be null` when missing) |
 | 400 | `BAD_REQUEST` | `comment: size must be between 0 and 2000` | comment too long |
-| 403 | `FORBIDDEN` | `This survey opens once the chapter's session starts.` | `session_date` is still in the future |
 | 409 | `CONFLICT` | `You already submitted the survey for this chapter.` | the caller already answered this chapter |

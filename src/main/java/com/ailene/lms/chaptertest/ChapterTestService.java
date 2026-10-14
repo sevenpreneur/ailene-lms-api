@@ -2,17 +2,15 @@ package com.ailene.lms.chaptertest;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
-import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterAccessGuard;
 import com.ailene.lms.chapter.ChapterRepository;
 import com.ailene.lms.common.ChapterSummary;
 import com.ailene.lms.common.Status;
 import com.ailene.lms.common.exception.ConflictException;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
-import com.ailene.lms.level.Level;
-import com.ailene.lms.level.LevelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -30,15 +28,15 @@ public class ChapterTestService {
     private final AuthService authService;
     private final AccessRepository accessRepository;
     private final ChapterRepository chapterRepository;
-    private final LevelRepository levelRepository;
     private final ChapterTestRepository chapterTestRepository;
     private final ChapterTestSubmissionRepository chapterTestSubmissionRepository;
+    private final ChapterAccessGuard chapterAccessGuard;
 
     public ChapterTestDetailsResponse getDetails(String jwt, ChapterTestDetailsRequest request) {
         UUID userId = authService.resolveUserId(jwt);
         ChapterTest test = resolveTest(request.testId());
         Chapter chapter = resolveChapter(test.getChapterId());
-        Access access = resolveAccessAndRequireUnlock(userId, chapter);
+        Access access = resolveUnlocked(userId, chapter);
 
         ChapterTestPair pair = ChapterTestPair.from(
                 chapterTestRepository.findChapterTests(chapter.getId(), access.getId()));
@@ -60,7 +58,7 @@ public class ChapterTestService {
         UUID userId = authService.resolveUserId(jwt);
         ChapterTest test = resolveTest(request.testId());
         Chapter chapter = resolveChapter(test.getChapterId());
-        Access access = resolveAccessAndRequireUnlock(userId, chapter);
+        Access access = resolveUnlocked(userId, chapter);
 
         ChapterTestPair pair = ChapterTestPair.from(
                 chapterTestRepository.findChapterTests(chapter.getId(), access.getId()));
@@ -98,7 +96,7 @@ public class ChapterTestService {
         UUID userId = authService.resolveUserId(jwt);
         ChapterTest test = resolveTest(request.testId());
         Chapter chapter = resolveChapter(test.getChapterId());
-        Access access = resolveAccess(userId, chapter);
+        Access access = resolveUnlocked(userId, chapter);
 
         ChapterTestSubmission submission = chapterTestSubmissionRepository
                 .findByStudentAccessIdAndTestId(access.getId(), test.getId())
@@ -161,22 +159,10 @@ public class ChapterTestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chapter not found"));
     }
 
-    private Access resolveAccess(UUID userId, Chapter chapter) {
-        return accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
+    private Access resolveUnlocked(UUID userId, Chapter chapter) {
+        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
-    }
-
-    private Access resolveAccessAndRequireUnlock(UUID userId, Chapter chapter) {
-        Level level = levelRepository.findById(chapter.getLevelId())
-                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = resolveAccess(userId, chapter);
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, chapter.getProjectId())
-                .orElse(null);
-        short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
-                : status.getCurrentLevelNumber();
-        if (level.getLevelNumber() > currentLevelNumber) {
-            throw new ForbiddenException("This level hasn't been unlocked yet.");
-        }
+        chapterAccessGuard.requireUnlocked(chapter.getId(), access.getId());
         return access;
     }
 }

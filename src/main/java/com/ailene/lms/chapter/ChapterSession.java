@@ -63,6 +63,10 @@ public class ChapterSession {
     @Column(nullable = false)
     private Status status;
 
+    // An admin override that keeps the chapter locked for this session's audience even after session_date
+    @Column(name = "is_locked", nullable = false, insertable = false)
+    private Boolean isLocked;
+
     @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private OffsetDateTime createdAt;
 

@@ -57,7 +57,7 @@ Returns one quiz's detail plus its full question list — for taking the quiz, n
 }
 ```
 
-`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/v1/learnings/task`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level. The quiz's level must already be unlocked for the caller (see `Level not unlocked yet` below).
+`question_count`/`xp_reward` (the quiz's total, sum of its questions')/`attempts` are the same fields and derivation as the quiz entry in `POST /api/v1/learnings/task`, minus `xp_earned`/`best_score`. `questions` is ordered by `order_index` ascending, and each question's `options` by `option_code` ascending. `project_id` isn't part of the request — it's resolved internally from `quiz_id` via the quiz's chapter → level. The quiz's chapter must be unlocked for the caller (see Chapter lock in `docs/api/learnings.md`).
 
 **Errors**
 
@@ -67,7 +67,9 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the quiz's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/attempt`
 
@@ -125,7 +127,7 @@ Starts a new quiz attempt, or resumes the caller's existing in-progress draft fo
 }
 ```
 
-`status` is `"active"` for a new or still-in-time attempt, `"finalized"` when the existing draft had already run out the clock and was just scored instead (call `POST /api/v1/quizzes/result` to read the outcome). On a new attempt, `answers` starts as `{}`; on a resumed one it's whatever was last saved via `update` below, keyed by `question_id` (string) → `option_code`. `attempt_number` isn't returned here — it's only surfaced by `submit`/`result`. Same level-unlock requirement as `details` above.
+`status` is `"active"` for a new or still-in-time attempt, `"finalized"` when the existing draft had already run out the clock and was just scored instead (call `POST /api/v1/quizzes/result` to read the outcome). On a new attempt, `answers` starts as `{}`; on a resumed one it's whatever was last saved via `update` below, keyed by `question_id` (string) → `option_code`. `attempt_number` isn't returned here — it's only surfaced by `submit`/`result`. Same chapter-lock requirement as `details` above.
 
 **Errors**
 
@@ -135,11 +137,13 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the quiz's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/update`
 
-Autosaves answers to the caller's active (not yet completed) draft for a quiz — meant to be called repeatedly as the student answers questions, well before they hit "submit". Unlike `attempt`/`submit`, this endpoint does **not** re-check whether the quiz's level is still unlocked (an attempt already in progress is allowed to run to completion), it only requires an active draft to exist.
+Autosaves answers to the caller's active (not yet completed) draft for a quiz — meant to be called repeatedly as the student answers questions, well before they hit "submit". It requires an active draft and, like every quiz endpoint, an unlocked chapter: if an admin locks the chapter mid-attempt, autosaves answer `403` and the QStash `auto-submit` still scores the draft from its last saved answers when the 20 minutes run out.
 
 **Authorization:** `Bearer <jwt>` — the `data.token` from `auth/login/google`.
 
@@ -179,6 +183,9 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 | 400 | `BAD_REQUEST` | `No active attempt. Start an attempt first.` | no non-finalized `lms_quiz_submissions` row exists for this `(access, quiz)` — call `attempt` first |
 
 ### `POST {base_url}/api/v1/quizzes/submit`
@@ -213,7 +220,7 @@ Finalizes a quiz attempt: scores the given answers against the answer key, marks
 }
 ```
 
-`score` is `round(correct_answers / question_count * 100)`, `0` if the quiz has no questions. XP uses a best-attempt-wins rule scoped to `(access, quiz)`: the sum of `xp_reward` from correctly-answered questions on *this* attempt is compared against whatever XP was already earned for this quiz (if any), and `lms_xp_earnings` is only raised, never lowered — `xp_awarded` is the delta actually added this call (`0` if this attempt didn't beat the existing best). Calling `submit` again for an already-completed attempt is a no-op: it returns the stored `score` with `xp_awarded: 0` rather than re-scoring. Same level-unlock requirement as `details` above.
+`score` is `round(correct_answers / question_count * 100)`, `0` if the quiz has no questions. XP uses a best-attempt-wins rule scoped to `(access, quiz)`: the sum of `xp_reward` from correctly-answered questions on *this* attempt is compared against whatever XP was already earned for this quiz (if any), and `lms_xp_earnings` is only raised, never lowered — `xp_awarded` is the delta actually added this call (`0` if this attempt didn't beat the existing best). Calling `submit` again for an already-completed attempt is a no-op: it returns the stored `score` with `xp_awarded: 0` rather than re-scoring. Same chapter-lock requirement as `details` above.
 
 **Errors**
 
@@ -223,7 +230,9 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the quiz's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/result`
 
@@ -280,7 +289,7 @@ Returns the caller's most recent **completed** attempt for a quiz (highest `atte
 }
 ```
 
-`xp_earned` is the caller's current `lms_xp_earnings` value for this quiz (the best-attempt-wins total from `submit`, not necessarily this particular attempt's own XP). `project_id` isn't part of the request — resolved internally from `quiz_id` via the quiz's chapter → level, same as `details`.
+`xp_earned` is the caller's current `lms_xp_earnings` value for this quiz (the best-attempt-wins total from `submit`, not necessarily this particular attempt's own XP). `project_id` isn't part of the request — resolved internally from `quiz_id` via the quiz's chapter → level, and the chapter must be unlocked, same as `details`.
 
 **Errors**
 
@@ -291,6 +300,9 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 | 404 | `NOT_FOUND` | `Quiz submission not found` | the caller has no completed `lms_quiz_submissions` row for this quiz yet |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/auto-submit` (internal)
 

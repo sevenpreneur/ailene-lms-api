@@ -1,6 +1,6 @@
 # Admin
 
-Endpoints for Ailene administrators to manage a project's groups and who can access it. `/api/v1/admin/projects` lists the projects to pick from, `/api/v1/admin/groups/*` creates, renames and deletes a project's groups (`lms_groups`), and `/api/v1/admin/users/*` invites people into a project and group, changes their role, group or profile, and removes them (`lms_accesses`, plus `lms_users` for the person).
+Endpoints for Ailene administrators to manage a project's groups and who can access it. `/api/v1/admin/projects` lists the projects to pick from, `/api/v1/admin/groups/*` creates, renames and deletes a project's groups (`lms_groups`), `/api/v1/admin/chapter-sessions/*` lists a project's chapter sessions and locks or unlocks one, and `/api/v1/admin/users/*` invites people into a project and group, changes their role, group or profile, and removes them (`lms_accesses`, plus `lms_users` for the person).
 
 **Authorization:** these endpoints do **not** take the LMS session from `auth/login/google`. They take the identity service's own session token, sent as `Authorization: Bearer <token>`, which is the value stored in its `tokens` table. The token has to match an active `tokens` row exactly (`is_active = true`), its `exp` claim must be in the future, and the `users` row it belongs to must have `role = 'administrator'`, `status = 'active'` and no `deleted_at`. The LMS doesn't hold the identity service's signing key, so it can't verify the signature itself. The exact match against a row the identity service wrote is the proof, and logging out there (deactivating or deleting the row) ends access here straight away. An administrator needs no `lms_users` row and no access to the project they manage.
 
@@ -170,6 +170,81 @@ Every access must belong to a group, so a group that still has members can't be 
   "code": 409,
   "status": "CONFLICT",
   "message": "This group still has members; move or remove them first",
+  "data": null
+}
+```
+
+## Chapter sessions
+
+### `POST {base_url}/api/v1/admin/chapter-sessions`
+
+Lists every `lms_chapter_sessions` row in a project, active or not, sorted by `session_date` then `id`.
+
+**Authorization:** `Bearer <token>` from the identity service, administrator.
+
+**Request** — `{ "project_id": "..." }`.
+
+**Response** — `200 OK`
+
+```json
+{
+  "success": true,
+  "code": 200,
+  "status": "OK",
+  "message": "chapter sessions retrieved successfully",
+  "data": [
+    {
+      "id": 12,
+      "chapter_id": 5,
+      "only_group_id": null,
+      "session_date": "2026-06-26T02:00:00Z",
+      "status": "active",
+      "is_locked": false,
+      "updated_at": "2026-10-14T03:12:45.120Z"
+    }
+  ]
+}
+```
+
+`only_group_id` is `null` for a session every group in the project attends, and a group id for a session only that group attends.
+
+**Errors** — only the shared ones.
+
+### `POST {base_url}/api/v1/admin/chapter-sessions/lock`
+
+Sets or clears the admin lock on one chapter session.
+
+**Authorization:** `Bearer <token>` from the identity service, administrator.
+
+**Request**
+
+```json
+{ "project_id": "V7rdgcYkq9PHQZkwvoA-F", "session_id": 12, "is_locked": true }
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `project_id` | string | yes |
+| `session_id` | integer | yes |
+| `is_locked` | boolean | yes |
+
+**Response** — `200 OK`, `data` is the updated session (same shape as one entry of the list above), message `chapter session updated successfully`.
+
+While `is_locked` is `true`, the chapter is locked for everyone that session applies to, even after `session_date` (see Chapter lock in `docs/api/learnings.md`). Only this one row changes. A group whose own session targets the chapter keeps following that session, so locking a group-specific session affects only that group, and locking the all-groups session leaves groups with their own session alone. Setting the value it already has is not an error.
+
+**Errors**
+
+| Code | Status | Message | When |
+|---|---|---|---|
+| 400 | `BAD_REQUEST` | `isLocked: must not be null` | `is_locked` missing (`sessionId: must not be null` likewise) |
+| 404 | `NOT_FOUND` | `Chapter session not found` | no session with that id in this project |
+
+```json
+{
+  "success": false,
+  "code": 404,
+  "status": "NOT_FOUND",
+  "message": "Chapter session not found",
   "data": null
 }
 ```

@@ -193,6 +193,7 @@ CREATE TABLE lms_chapter_sessions (
   status            status_enum              NOT NULL  DEFAULT 'active',
   created_at        TIMESTAMPTZ              NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMPTZ              NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  is_locked         BOOLEAN                  NOT NULL  DEFAULT FALSE,
   UNIQUE (chapter_id, only_group_id)
 );
 

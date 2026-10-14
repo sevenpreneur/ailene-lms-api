@@ -48,7 +48,7 @@ Returns one material's full body (`content`/`file_url`/`image_url` included — 
 }
 ```
 
-`completed`/`completed_at` come from the caller's `lms_material_completions` row (`false`/`null` if not completed yet). Materials don't track `xp_earned` separately (same as the list endpoint) — their `xp_reward` is granted in full on completion. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level. The material's level must already be unlocked for the caller (see `Level not unlocked yet` below) — this applies to every access role, not students only.
+`completed`/`completed_at` come from the caller's `lms_material_completions` row (`false`/`null` if not completed yet). Materials don't track `xp_earned` separately (same as the list endpoint) — their `xp_reward` is granted in full on completion. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level. The material's chapter must be unlocked for the caller (see Chapter lock in `docs/api/learnings.md`) — this applies to every access role, not students only.
 
 **Errors**
 
@@ -58,7 +58,9 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the material's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/materials/completion`
 
@@ -95,7 +97,7 @@ Marks a material complete for the caller and awards its XP. Idempotent — calli
 }
 ```
 
-`completed` is always `true` on success. `completed_at` is the timestamp of the *first* completion — replaying this call doesn't move it. `xp_awarded` is the material's `xp_reward` on first completion, `0` on every call after that (XP is granted once per `(access, material)`, backed by `lms_xp_earnings`'s unique constraint). Same level-unlock requirement as `details` above — this blocks completing (and farming XP from) a material whose level isn't open yet, not just viewing it.
+`completed` is always `true` on success. `completed_at` is the timestamp of the *first* completion — replaying this call doesn't move it. `xp_awarded` is the material's `xp_reward` on first completion, `0` on every call after that (XP is granted once per `(access, material)`, backed by `lms_xp_earnings`'s unique constraint). Same chapter-lock requirement as `details` above — this blocks completing (and farming XP from) a material whose chapter isn't open yet, not just viewing it.
 
 **Errors**
 
@@ -105,7 +107,9 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the material's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/materials/in-level`
 
@@ -157,7 +161,7 @@ Returns every active material in the same level as the given material — the "o
 }
 ```
 
-`material_id`'s chapter → level determines the level being listed; `level_number` is that level's number. `materials` covers every active material across every active chapter of that level, ordered by the chapter's `session_date` ascending then the material's `order_index` ascending, with `index` numbered sequentially across that whole ordering (not reset per chapter). `completed` comes from the caller's `lms_material_completions` rows. `locked` is `true` unless both: (1) the level is unlocked — the level's `level_number` is at or below the caller's `lms_accesses.current_level_id` level number — and (2) that material's chapter `session_date` has already started. `is_current` flags the material matching the request's `material_id`. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
+`material_id`'s chapter → level determines the level being listed; `level_number` is that level's number. `materials` covers every active material across every active chapter of that level, ordered by the chapter's `session_date` ascending then the material's `order_index` ascending, with `index` numbered sequentially across that whole ordering (not reset per chapter). `completed` comes from the caller's `lms_material_completions` rows. `locked` is the chapter lock for that material's chapter (see Chapter lock in `docs/api/learnings.md`): `true` while its applicable session hasn't reached `session_date` or has `is_locked = true`. The caller's current level is not part of it. The request's own `material_id` must be in an unlocked chapter, or the call answers `403`. `is_current` flags the material matching the request's `material_id`. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
 
 **Errors**
 
@@ -168,3 +172,6 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `Level not found` | the material's chapter references a level that no longer exists |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |

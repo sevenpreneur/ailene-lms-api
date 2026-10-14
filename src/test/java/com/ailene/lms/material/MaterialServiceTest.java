@@ -2,13 +2,15 @@ package com.ailene.lms.material;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
-import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterAccessGuard;
+import com.ailene.lms.chapter.ChapterLockedReason;
 import com.ailene.lms.chapter.ChapterRepository;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,11 +25,18 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MaterialServiceTest {
+
+    private static final UUID USER_ID = UUID.randomUUID();
 
     @Mock
     private AuthService authService;
@@ -39,42 +48,60 @@ class MaterialServiceTest {
     private LevelRepository levelRepository;
     @Mock
     private MaterialRepository materialRepository;
+    @Mock
+    private ChapterAccessGuard chapterAccessGuard;
 
     @InjectMocks
     private MaterialService materialService;
 
-    // findCompletion() returns null (not a projection with a null getter) when the student has no completion row.
-    @Test
-    void materialDetails_uncompletedMaterial_doesNotThrow() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material material = new Material();
-        material.setId("mat-1");
-        material.setChapterId(1);
-        material.setTitle("Title");
-        material.setXpReward((short) 10);
-        material.setOrderIndex((short) 0);
-        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(material));
+    @BeforeEach
+    void setUp() {
+        when(authService.resolveUserId("jwt")).thenReturn(USER_ID);
 
         Chapter chapter = new Chapter();
         chapter.setId(1);
         chapter.setLevelId(1);
         chapter.setName("Chapter");
-        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
-
-        Level level = new Level();
-        level.setId(1);
         chapter.setProjectId("proj-1");
-        level.setLevelNumber((short) 0);
-        when(levelRepository.findById(1)).thenReturn(Optional.of(level));
+        lenient().when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
 
         Access access = new Access();
         access.setId("access-1");
         access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
+        lenient().when(accessRepository.findByUserIdAndProjectId(USER_ID, "proj-1")).thenReturn(Optional.of(access));
+    }
 
+    private Material givenMaterial(String id) {
+        Material material = new Material();
+        material.setId(id);
+        material.setChapterId(1);
+        material.setTitle("Title");
+        material.setXpReward((short) 10);
+        material.setOrderIndex((short) 0);
+        when(materialRepository.findById(id)).thenReturn(Optional.of(material));
+        return material;
+    }
+
+    private void givenChapterLocked(ChapterLockedReason reason) {
+        when(chapterAccessGuard.requireUnlocked(1, "access-1"))
+                .thenThrow(new ForbiddenException(ChapterAccessGuard.message(reason)));
+    }
+
+    private static LevelMaterialProjection levelRow(String id, Instant sessionDate, Boolean sessionLocked,
+            boolean completed) {
+        LevelMaterialProjection row = mock(LevelMaterialProjection.class);
+        when(row.getMaterialId()).thenReturn(id);
+        when(row.getMaterialTitle()).thenReturn(id.toUpperCase());
+        when(row.getSessionDate()).thenReturn(sessionDate);
+        lenient().when(row.getSessionLocked()).thenReturn(sessionLocked);
+        when(row.getCompleted()).thenReturn(completed);
+        return row;
+    }
+
+    // findCompletion() returns null (not a projection with a null getter) when the student has no completion row.
+    @Test
+    void materialDetails_uncompletedMaterial_doesNotThrow() {
+        givenMaterial("mat-1");
         when(materialRepository.findCompletion("mat-1", "access-1")).thenReturn(null);
 
         MaterialDetailsResponse response = materialService.getMaterialDetails("jwt",
@@ -82,108 +109,34 @@ class MaterialServiceTest {
 
         assertThat(response.completed()).isFalse();
         assertThat(response.completedAt()).isNull();
+        verify(chapterAccessGuard).requireUnlocked(1, "access-1");
     }
 
     @Test
-    void materialDetails_levelNotUnlocked_throwsForbidden() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material material = new Material();
-        material.setId("mat-1");
-        material.setChapterId(1);
-        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(material));
-
-        Chapter chapter = new Chapter();
-        chapter.setId(1);
-        chapter.setLevelId(2);
-        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
-
-        Level level = new Level();
-        level.setId(2);
-        chapter.setProjectId("proj-1");
-        level.setLevelNumber((short) 2);
-        when(levelRepository.findById(2)).thenReturn(Optional.of(level));
-
-        Access access = new Access();
-        access.setId("access-1");
-        access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-
-        StudentStatusProjection status = mock(StudentStatusProjection.class);
-        when(status.getCurrentLevelNumber()).thenReturn((short) 1);
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.of(status));
+    void materialDetails_sessionNotStarted_throwsForbidden() {
+        givenMaterial("mat-1");
+        givenChapterLocked(ChapterLockedReason.session_not_started);
 
         assertThatThrownBy(() -> materialService.getMaterialDetails("jwt", new MaterialDetailsRequest("mat-1")))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("This chapter opens when its session starts.");
     }
 
     @Test
-    void completeMaterial_levelNotUnlocked_throwsForbidden() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material material = new Material();
-        material.setId("mat-1");
-        material.setChapterId(1);
-        material.setXpReward((short) 10);
-        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(material));
-
-        Chapter chapter = new Chapter();
-        chapter.setId(1);
-        chapter.setLevelId(2);
-        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
-
-        Level level = new Level();
-        level.setId(2);
-        chapter.setProjectId("proj-1");
-        level.setLevelNumber((short) 2);
-        when(levelRepository.findById(2)).thenReturn(Optional.of(level));
-
-        Access access = new Access();
-        access.setId("access-1");
-        access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-
-        StudentStatusProjection status = mock(StudentStatusProjection.class);
-        when(status.getCurrentLevelNumber()).thenReturn((short) 1);
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.of(status));
+    void completeMaterial_adminLocked_throwsForbiddenAndWritesNothing() {
+        givenMaterial("mat-1");
+        givenChapterLocked(ChapterLockedReason.admin_locked);
 
         assertThatThrownBy(() -> materialService.completeMaterial("jwt", new MaterialCompletionRequest("mat-1")))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("This chapter has been locked by an admin.");
+        verify(materialRepository, never()).insertCompletion(anyString(), anyString());
+        verify(materialRepository, never()).insertXpEarning(anyString(), anyString(), any());
     }
 
     @Test
     void completeMaterial_firstCompletion_awardsXp() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material material = new Material();
-        material.setId("mat-1");
-        material.setChapterId(1);
-        material.setTitle("Title");
-        material.setXpReward((short) 10);
-        material.setOrderIndex((short) 0);
-        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(material));
-
-        Chapter chapter = new Chapter();
-        chapter.setId(1);
-        chapter.setLevelId(1);
-        chapter.setName("Chapter");
-        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
-
-        Level level = new Level();
-        level.setId(1);
-        chapter.setProjectId("proj-1");
-        level.setLevelNumber((short) 0);
-        when(levelRepository.findById(1)).thenReturn(Optional.of(level));
-
-        Access access = new Access();
-        access.setId("access-1");
-        access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
-
+        givenMaterial("mat-1");
         when(materialRepository.insertXpEarning("mat-1", "access-1", (short) 10)).thenReturn(1);
         MaterialCompletionProjection completion = mock(MaterialCompletionProjection.class);
         when(completion.getCompletedAt()).thenReturn(Instant.now());
@@ -199,35 +152,7 @@ class MaterialServiceTest {
 
     @Test
     void completeMaterial_alreadyCompleted_awardsNoXp() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material material = new Material();
-        material.setId("mat-1");
-        material.setChapterId(1);
-        material.setTitle("Title");
-        material.setXpReward((short) 10);
-        material.setOrderIndex((short) 0);
-        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(material));
-
-        Chapter chapter = new Chapter();
-        chapter.setId(1);
-        chapter.setLevelId(1);
-        chapter.setName("Chapter");
-        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
-
-        Level level = new Level();
-        level.setId(1);
-        chapter.setProjectId("proj-1");
-        level.setLevelNumber((short) 0);
-        when(levelRepository.findById(1)).thenReturn(Optional.of(level));
-
-        Access access = new Access();
-        access.setId("access-1");
-        access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
-
+        givenMaterial("mat-1");
         when(materialRepository.insertXpEarning("mat-1", "access-1", (short) 10)).thenReturn(0);
         MaterialCompletionProjection completion = mock(MaterialCompletionProjection.class);
         when(completion.getCompletedAt()).thenReturn(Instant.now());
@@ -241,111 +166,38 @@ class MaterialServiceTest {
     }
 
     @Test
-    void levelMaterials_ordersAcrossChaptersAndLocksUnstartedSessions() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material current = new Material();
-        current.setId("mat-2");
-        current.setChapterId(2);
-        when(materialRepository.findById("mat-2")).thenReturn(Optional.of(current));
-
-        Chapter chapter = new Chapter();
-        chapter.setId(2);
-        chapter.setLevelId(1);
-        chapter.setName("Chapter 2");
-        when(chapterRepository.findById(2)).thenReturn(Optional.of(chapter));
-
+    void levelMaterials_locksUnstartedAndAdminLockedSessionsOnly() {
+        givenMaterial("mat-1");
         Level level = new Level();
         level.setId(1);
-        chapter.setProjectId("proj-1");
         level.setLevelNumber((short) 2);
         when(levelRepository.findById(1)).thenReturn(Optional.of(level));
 
-        Access access = new Access();
-        access.setId("access-1");
-        access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-
-        StudentStatusProjection status = mock(StudentStatusProjection.class);
-        when(status.getCurrentLevelNumber()).thenReturn((short) 2);
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.of(status));
-
-        LevelMaterialProjection row1 = mock(LevelMaterialProjection.class);
-        when(row1.getMaterialId()).thenReturn("mat-1");
-        when(row1.getMaterialTitle()).thenReturn("M1");
-        when(row1.getSessionDate()).thenReturn(Instant.now().minus(1, ChronoUnit.DAYS));
-        when(row1.getCompleted()).thenReturn(true);
-
-        LevelMaterialProjection row2 = mock(LevelMaterialProjection.class);
-        when(row2.getMaterialId()).thenReturn("mat-2");
-        when(row2.getMaterialTitle()).thenReturn("M2");
-        when(row2.getSessionDate()).thenReturn(Instant.now().plus(1, ChronoUnit.DAYS));
-        when(row2.getCompleted()).thenReturn(false);
-
-        when(materialRepository.findLevelMaterials(1, "access-1")).thenReturn(List.of(row1, row2));
-
-        LevelMaterialsResponse response = materialService.getLevelMaterials("jwt",
-                new LevelMaterialsRequest("mat-2"));
-
-        assertThat(response.levelNumber()).isEqualTo((short) 2);
-        assertThat(response.materials()).hasSize(2);
-
-        LevelMaterialItem first = response.materials().get(0);
-        assertThat(first.id()).isEqualTo("mat-1");
-        assertThat(first.index()).isEqualTo(1);
-        assertThat(first.completed()).isTrue();
-        assertThat(first.locked()).isFalse();
-        assertThat(first.isCurrent()).isFalse();
-
-        LevelMaterialItem second = response.materials().get(1);
-        assertThat(second.id()).isEqualTo("mat-2");
-        assertThat(second.index()).isEqualTo(2);
-        assertThat(second.completed()).isFalse();
-        assertThat(second.locked()).isTrue();
-        assertThat(second.isCurrent()).isTrue();
-    }
-
-    @Test
-    void levelMaterials_levelNotYetUnlocked_locksEveryItem() {
-        UUID userId = UUID.randomUUID();
-        when(authService.resolveUserId("jwt")).thenReturn(userId);
-
-        Material current = new Material();
-        current.setId("mat-1");
-        current.setChapterId(1);
-        when(materialRepository.findById("mat-1")).thenReturn(Optional.of(current));
-
-        Chapter chapter = new Chapter();
-        chapter.setId(1);
-        chapter.setLevelId(3);
-        chapter.setName("Chapter 1");
-        when(chapterRepository.findById(1)).thenReturn(Optional.of(chapter));
-
-        Level level = new Level();
-        level.setId(3);
-        chapter.setProjectId("proj-1");
-        level.setLevelNumber((short) 3);
-        when(levelRepository.findById(3)).thenReturn(Optional.of(level));
-
-        Access access = new Access();
-        access.setId("access-1");
-        access.setProjectId("proj-1");
-        when(accessRepository.findByUserIdAndProjectId(userId, "proj-1")).thenReturn(Optional.of(access));
-
-        when(accessRepository.findStudentStatus(userId, "proj-1")).thenReturn(Optional.empty());
-
-        LevelMaterialProjection row = mock(LevelMaterialProjection.class);
-        when(row.getMaterialId()).thenReturn("mat-1");
-        when(row.getMaterialTitle()).thenReturn("M1");
-        when(row.getSessionDate()).thenReturn(Instant.now().minus(1, ChronoUnit.DAYS));
-        when(row.getCompleted()).thenReturn(false);
-        when(materialRepository.findLevelMaterials(3, "access-1")).thenReturn(List.of(row));
+        Instant yesterday = Instant.now().minus(1, ChronoUnit.DAYS);
+        LevelMaterialProjection open = levelRow("mat-1", yesterday, false, true);
+        LevelMaterialProjection future = levelRow("mat-2", Instant.now().plus(1, ChronoUnit.DAYS), false, false);
+        LevelMaterialProjection adminLocked = levelRow("mat-3", yesterday, true, false);
+        when(materialRepository.findLevelMaterials(1, "access-1")).thenReturn(List.of(open, future, adminLocked));
 
         LevelMaterialsResponse response = materialService.getLevelMaterials("jwt",
                 new LevelMaterialsRequest("mat-1"));
 
-        assertThat(response.materials()).hasSize(1);
-        assertThat(response.materials().get(0).locked()).isTrue();
+        assertThat(response.levelNumber()).isEqualTo((short) 2);
+        assertThat(response.materials()).extracting(LevelMaterialItem::id)
+                .containsExactly("mat-1", "mat-2", "mat-3");
+        assertThat(response.materials()).extracting(LevelMaterialItem::index).containsExactly(1, 2, 3);
+        assertThat(response.materials()).extracting(LevelMaterialItem::locked).containsExactly(false, true, true);
+        assertThat(response.materials()).extracting(LevelMaterialItem::isCurrent).containsExactly(true, false, false);
+        assertThat(response.materials().get(0).completed()).isTrue();
+    }
+
+    @Test
+    void levelMaterials_lockedAnchorChapter_throwsForbidden() {
+        givenMaterial("mat-1");
+        givenChapterLocked(ChapterLockedReason.admin_locked);
+
+        assertThatThrownBy(() -> materialService.getLevelMaterials("jwt", new LevelMaterialsRequest("mat-1")))
+                .isInstanceOf(ForbiddenException.class);
+        verify(materialRepository, never()).findLevelMaterials(any(), anyString());
     }
 }

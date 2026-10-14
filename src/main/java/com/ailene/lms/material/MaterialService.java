@@ -2,13 +2,13 @@ package com.ailene.lms.material;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
-import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterAccessGuard;
 import com.ailene.lms.chapter.ChapterRepository;
+import com.ailene.lms.chapter.ChapterSchedule;
 import com.ailene.lms.common.ChapterSummary;
 import com.ailene.lms.common.TimeUtils;
-import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
@@ -30,6 +30,7 @@ public class MaterialService {
     private final ChapterRepository chapterRepository;
     private final LevelRepository levelRepository;
     private final MaterialRepository materialRepository;
+    private final ChapterAccessGuard chapterAccessGuard;
 
     public MaterialDetailsResponse getMaterialDetails(String jwt, MaterialDetailsRequest request) {
         UUID userId = authService.resolveUserId(jwt);
@@ -37,9 +38,8 @@ public class MaterialService {
         Material material = materialRepository.findById(request.materialId())
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
         Chapter chapter = resolveChapter(material.getChapterId());
-        AccessContext ctx = resolveAccess(userId, chapter);
-        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
-        Access access = ctx.access();
+        Access access = resolveAccess(userId, chapter);
+        chapterAccessGuard.requireUnlocked(chapter.getId(), access.getId());
 
         var completion = materialRepository.findCompletion(material.getId(), access.getId());
         Instant completedAt = completion == null ? null : completion.getCompletedAt();
@@ -58,9 +58,8 @@ public class MaterialService {
         Material material = materialRepository.findById(request.materialId())
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
         Chapter chapter = resolveChapter(material.getChapterId());
-        AccessContext ctx = resolveAccess(userId, chapter);
-        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
-        Access access = ctx.access();
+        Access access = resolveAccess(userId, chapter);
+        chapterAccessGuard.requireUnlocked(chapter.getId(), access.getId());
 
         materialRepository.insertCompletion(material.getId(), access.getId());
         int inserted = materialRepository.insertXpEarning(material.getId(), access.getId(), material.getXpReward());
@@ -79,25 +78,19 @@ public class MaterialService {
         Material current = materialRepository.findById(request.materialId())
                 .orElseThrow(() -> new ResourceNotFoundException("Material not found"));
         Chapter chapter = resolveChapter(current.getChapterId());
-        AccessContext ctx = resolveAccess(userId, chapter);
-        Access access = ctx.access();
-        Level level = ctx.level();
-
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, access.getProjectId())
-                .orElse(null);
-        short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
-                : status.getCurrentLevelNumber();
-        boolean levelUnlocked = level.getLevelNumber() <= currentLevelNumber;
+        Access access = resolveAccess(userId, chapter);
+        chapterAccessGuard.requireUnlocked(chapter.getId(), access.getId());
+        Level level = levelRepository.findById(chapter.getLevelId())
+                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
 
         Instant now = Instant.now();
         List<LevelMaterialItem> materials = new ArrayList<>();
         int index = 0;
         for (LevelMaterialProjection row : materialRepository.findLevelMaterials(level.getId(), access.getId())) {
             index++;
-            boolean sessionStarted = !row.getSessionDate().isAfter(now);
-            boolean unlocked = levelUnlocked && sessionStarted;
+            boolean locked = ChapterSchedule.lockedReason(row.getSessionLocked(), row.getSessionDate(), now) != null;
             materials.add(new LevelMaterialItem(row.getMaterialId(), row.getMaterialTitle(), index,
-                    row.getCompleted(), !unlocked, row.getMaterialId().equals(request.materialId())));
+                    row.getCompleted(), locked, row.getMaterialId().equals(request.materialId())));
         }
 
         return new LevelMaterialsResponse(level.getLevelNumber(), materials);
@@ -108,24 +101,8 @@ public class MaterialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chapter not found"));
     }
 
-    private AccessContext resolveAccess(UUID userId, Chapter chapter) {
-        Level level = levelRepository.findById(chapter.getLevelId())
-                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
+    private Access resolveAccess(UUID userId, Chapter chapter) {
+        return accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
-        return new AccessContext(access, level);
-    }
-
-    private void requireLevelUnlocked(UUID userId, String projectId, Level level) {
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, projectId)
-                .orElse(null);
-        short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
-                : status.getCurrentLevelNumber();
-        if (level.getLevelNumber() > currentLevelNumber) {
-            throw new ForbiddenException("This level hasn't been unlocked yet.");
-        }
-    }
-
-    private record AccessContext(Access access, Level level) {
     }
 }

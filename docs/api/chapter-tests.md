@@ -77,7 +77,9 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Invalid or expired token` | bad signature, malformed JWT, or past `exp` |
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `testId: must not be null` | missing `test_id` |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the chapter's level is above the caller's current level |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 | 404 | `NOT_FOUND` | `Test not found` | no `lms_chapter_tests` row with that id, or it is `inactive` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the chapter's project |
 
@@ -137,7 +139,7 @@ Grades and stores the caller's one attempt at a test.
 
 **Errors**
 
-Same auth, `403` level lock and `404` cases as `details` above, plus:
+Same auth, `403` chapter lock and `404` cases as `details` above, plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
@@ -224,7 +226,7 @@ Returns the caller's submitted attempt with each question and their answer.
 
 **Errors**
 
-Same auth and `404 Test not found`/`No access found for this project` cases as `details` above (this endpoint skips the level-lock check, like `quizzes/result`), plus:
+Same auth, `403` chapter lock and `404 Test not found`/`No access found for this project` cases as `details` above, plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|

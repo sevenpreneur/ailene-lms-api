@@ -11,6 +11,8 @@ public interface ChapterListProjection {
 
     Instant getSessionDate();
 
+    Boolean getSessionLocked();
+
     Integer getDurationMinutes();
 
     String getLocationName();

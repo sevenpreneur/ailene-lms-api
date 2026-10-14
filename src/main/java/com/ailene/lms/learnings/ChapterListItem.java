@@ -1,16 +1,20 @@
 package com.ailene.lms.learnings;
 
 import com.ailene.lms.chapter.ChapterListProjection;
+import com.ailene.lms.chapter.ChapterLockedReason;
 import com.ailene.lms.chapter.ChapterMethod;
+import com.ailene.lms.chapter.ChapterSchedule;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 public record ChapterListItem(Integer id, String name, String description, OffsetDateTime sessionDate,
         Integer durationMinutes, String locationName, String locationUrl, ChapterMethod method,
-        ChapterLevelSummary level, Integer doneTasks, Integer totalTasks, ChapterProgress progress) {
+        ChapterLevelSummary level, Integer doneTasks, Integer totalTasks, ChapterProgress progress, Boolean locked,
+        ChapterLockedReason lockedReason) {
 
-    public static ChapterListItem from(ChapterListProjection projection) {
+    public static ChapterListItem from(ChapterListProjection projection, Instant now) {
         int done = projection.getDoneTasks() == null ? 0 : projection.getDoneTasks().intValue();
         int total = projection.getTotalTasks() == null ? 0 : projection.getTotalTasks().intValue();
 
@@ -25,10 +29,13 @@ public record ChapterListItem(Integer id, String name, String description, Offse
 
         ChapterLevelSummary level = new ChapterLevelSummary(projection.getLevelId(), projection.getLevelNumber(),
                 projection.getLevelName());
+        ChapterLockedReason lockedReason = ChapterSchedule.lockedReason(projection.getSessionLocked(),
+                projection.getSessionDate(), now);
 
         return new ChapterListItem(projection.getId(), projection.getName(), projection.getDescription(),
                 projection.getSessionDate().atOffset(ZoneOffset.UTC), projection.getDurationMinutes(),
                 projection.getLocationName(), projection.getLocationUrl(),
-                ChapterMethod.valueOf(projection.getMethod()), level, done, total, progress);
+                ChapterMethod.valueOf(projection.getMethod()), level, done, total, progress, lockedReason != null,
+                lockedReason);
     }
 }

@@ -33,6 +33,7 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
 
     @Query(value = """
             SELECT s.session_date AS sessionDate,
+                   s.is_locked AS sessionLocked,
                    m.id AS materialId,
                    m.title AS materialTitle,
                    m.order_index AS orderIndex,
@@ -41,11 +42,11 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
             FROM lms_chapters c
             JOIN lms_materials m ON m.chapter_id = c.id AND m.status = 'active'
             JOIN LATERAL (
-              SELECT s.session_date
+              SELECT s.session_date, s.is_locked
               FROM lms_chapter_sessions s
               WHERE s.chapter_id = c.id AND s.status = 'active'
                 AND (s.only_group_id IS NULL OR s.only_group_id = (SELECT a.group_id FROM lms_accesses a WHERE a.id = :accessId))
-              ORDER BY (s.only_group_id IS NULL)
+              ORDER BY (s.only_group_id IS NULL), s.id
               LIMIT 1
             ) s ON true
             WHERE c.level_id = :levelId AND c.status = 'active'

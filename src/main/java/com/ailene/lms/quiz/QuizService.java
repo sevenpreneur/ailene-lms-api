@@ -2,17 +2,14 @@ package com.ailene.lms.quiz;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
-import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterAccessGuard;
 import com.ailene.lms.chapter.ChapterRepository;
 import com.ailene.lms.common.ChapterSummary;
 import com.ailene.lms.common.exception.BadRequestException;
-import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.common.qstash.QStashClient;
-import com.ailene.lms.level.Level;
-import com.ailene.lms.level.LevelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,15 +31,15 @@ public class QuizService {
     private final AuthService authService;
     private final AccessRepository accessRepository;
     private final ChapterRepository chapterRepository;
-    private final LevelRepository levelRepository;
     private final QuizRepository quizRepository;
     private final QuizSubmissionRepository quizSubmissionRepository;
     private final QStashClient qStashClient;
+    private final ChapterAccessGuard chapterAccessGuard;
 
     public QuizDetailsResponse getQuizDetails(String jwt, QuizDetailsRequest request) {
         UUID userId = authService.resolveUserId(jwt);
         Quiz quiz = resolveQuiz(request.quizId());
-        AccessContext ctx = resolveAccessAndRequireUnlock(userId, quiz);
+        AccessContext ctx = resolveUnlocked(userId, quiz);
         Access access = ctx.access();
 
         QuizStatsProjection stats = quizRepository.findQuizStats(quiz.getId(), access.getId());
@@ -68,7 +65,7 @@ public class QuizService {
     public QuizAttemptResponse startAttempt(String jwt, QuizAttemptRequest request) {
         UUID userId = authService.resolveUserId(jwt);
         Quiz quiz = resolveQuiz(request.quizId());
-        Access access = resolveAccessAndRequireUnlock(userId, quiz).access();
+        Access access = resolveUnlocked(userId, quiz).access();
 
         QuizSubmission existing = quizSubmissionRepository
                 .findByStudentAccessIdAndQuizIdAndCompletedFalse(access.getId(), quiz.getId())
@@ -106,7 +103,7 @@ public class QuizService {
     public QuizUpdateResponse saveDraft(String jwt, QuizUpdateRequest request) {
         UUID userId = authService.resolveUserId(jwt);
         Quiz quiz = resolveQuiz(request.quizId());
-        Access access = resolveAccess(userId, quiz).access();
+        Access access = resolveUnlocked(userId, quiz).access();
 
         QuizSubmission draft = quizSubmissionRepository
                 .findByStudentAccessIdAndQuizIdAndCompletedFalse(access.getId(), quiz.getId())
@@ -128,7 +125,7 @@ public class QuizService {
     public QuizSubmitResponse submit(String jwt, QuizSubmitRequest request) {
         UUID userId = authService.resolveUserId(jwt);
         Quiz quiz = resolveQuiz(request.quizId());
-        Access access = resolveAccessAndRequireUnlock(userId, quiz).access();
+        Access access = resolveUnlocked(userId, quiz).access();
 
         QuizSubmission submission = quizSubmissionRepository
                 .findByStudentAccessIdAndQuizIdAndCompletedFalse(access.getId(), quiz.getId())
@@ -160,7 +157,7 @@ public class QuizService {
     public QuizResultResponse getResult(String jwt, QuizResultRequest request) {
         UUID userId = authService.resolveUserId(jwt);
         Quiz quiz = resolveQuiz(request.quizId());
-        AccessContext ctx = resolveAccess(userId, quiz);
+        AccessContext ctx = resolveUnlocked(userId, quiz);
         Access access = ctx.access();
 
         QuizSubmission latestCompleted = quizSubmissionRepository
@@ -255,33 +252,16 @@ public class QuizService {
         return quizRepository.findById(quizId).orElseThrow(() -> new ResourceNotFoundException("Quiz not found"));
     }
 
-    private AccessContext resolveAccess(UUID userId, Quiz quiz) {
+    private AccessContext resolveUnlocked(UUID userId, Quiz quiz) {
         Chapter chapter = chapterRepository.findById(quiz.getChapterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Chapter not found"));
-        Level level = levelRepository.findById(chapter.getLevelId())
-                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
         Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
-        return new AccessContext(access, chapter, level);
+        chapterAccessGuard.requireUnlocked(chapter.getId(), access.getId());
+        return new AccessContext(access, chapter);
     }
 
-    private AccessContext resolveAccessAndRequireUnlock(UUID userId, Quiz quiz) {
-        AccessContext ctx = resolveAccess(userId, quiz);
-        requireLevelUnlocked(userId, ctx.access().getProjectId(), ctx.level());
-        return ctx;
-    }
-
-    private void requireLevelUnlocked(UUID userId, String projectId, Level level) {
-        StudentStatusProjection status = accessRepository.findStudentStatus(userId, projectId)
-                .orElse(null);
-        short currentLevelNumber = status == null || status.getCurrentLevelNumber() == null ? 0
-                : status.getCurrentLevelNumber();
-        if (level.getLevelNumber() > currentLevelNumber) {
-            throw new ForbiddenException("This level hasn't been unlocked yet.");
-        }
-    }
-
-    private record AccessContext(Access access, Chapter chapter, Level level) {
+    private record AccessContext(Access access, Chapter chapter) {
     }
 
     private record FinalizeResult(short score, short xpAwarded, boolean alreadyCompleted) {

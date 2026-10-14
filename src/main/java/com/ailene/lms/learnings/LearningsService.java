@@ -5,15 +5,16 @@ import com.ailene.lms.access.AccessRepository;
 import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterAccessGuard;
 import com.ailene.lms.chapter.ChapterListProjection;
 import com.ailene.lms.chapter.ChapterRepository;
+import com.ailene.lms.chapter.ChapterSchedule;
 import com.ailene.lms.chaptertest.ChapterTestService;
 import com.ailene.lms.chaptertest.ChapterTestTasks;
 import com.ailene.lms.common.AssignedByUser;
 import com.ailene.lms.common.Status;
 import com.ailene.lms.common.TimeUtils;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
-import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
 import com.ailene.lms.material.MaterialFocusProjection;
 import com.ailene.lms.material.MaterialRepository;
@@ -54,12 +55,14 @@ public class LearningsService {
     private final UseCaseRepository useCaseRepository;
     private final ChapterTestService chapterTestService;
     private final ChapterSurveyService chapterSurveyService;
+    private final ChapterAccessGuard chapterAccessGuard;
 
     public LearningsResponse getTasks(String jwt, LearningsRequest request) {
         UUID userId = authService.resolveUserId(jwt);
 
         Chapter chapter = resolveChapter(request.chapterId());
-        Access access = resolveAccess(userId, chapter).access();
+        Access access = resolveAccess(userId, chapter);
+        chapterAccessGuard.requireUnlocked(chapter.getId(), access.getId());
 
         List<QuizTaskItem> quizzes = quizRepository.findQuizTasks(request.chapterId(), access.getId()).stream()
                 .map(QuizTaskItem::from)
@@ -84,8 +87,9 @@ public class LearningsService {
         Access access = accessRepository.findByUserIdAndProjectId(userId, request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
 
+        Instant now = Instant.now();
         List<ChapterListProjection> rows = chapterRepository.findChapterList(request.projectId(), access.getId());
-        return rows.stream().map(ChapterListItem::from).toList();
+        return rows.stream().map(row -> ChapterListItem.from(row, now)).toList();
     }
 
     public List<LevelDto> getLevels(String jwt, LevelListRequest request) {
@@ -127,7 +131,8 @@ public class LearningsService {
         Instant now = Instant.now();
         TodayFocusItem focus = null;
         for (ChapterListProjection chapter : chapters) {
-            if (chapter.getLevelNumber() > currentLevelNumber || chapter.getSessionDate().isAfter(now)) {
+            if (chapter.getLevelNumber() > currentLevelNumber
+                    || ChapterSchedule.lockedReason(chapter.getSessionLocked(), chapter.getSessionDate(), now) != null) {
                 continue;
             }
 
@@ -231,14 +236,8 @@ public class LearningsService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chapter not found"));
     }
 
-    private AccessContext resolveAccess(UUID userId, Chapter chapter) {
-        Level level = levelRepository.findById(chapter.getLevelId())
-                .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
-        Access access = accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
+    private Access resolveAccess(UUID userId, Chapter chapter) {
+        return accessRepository.findByUserIdAndProjectId(userId, chapter.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
-        return new AccessContext(access, level);
-    }
-
-    private record AccessContext(Access access, Level level) {
     }
 }

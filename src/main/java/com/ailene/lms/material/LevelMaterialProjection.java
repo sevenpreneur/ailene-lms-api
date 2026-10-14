@@ -11,5 +11,7 @@ public interface LevelMaterialProjection {
 
     Instant getSessionDate();
 
+    Boolean getSessionLocked();
+
     Boolean getCompleted();
 }

@@ -46,7 +46,7 @@ Returns one video's full detail plus the caller's own completion status.
 }
 ```
 
-`completed`/`completed_at` come from `lms_video_completions`. `project_id` isn't part of the request — it's resolved internally from `video_id` via the video's chapter → level. Same level-unlock requirement as `docs/api/materials.md`'s `details`.
+`completed`/`completed_at` come from `lms_video_completions`. `project_id` isn't part of the request — it's resolved internally from `video_id` via the video's chapter → level. Same chapter-lock requirement as `docs/api/materials.md`'s `details`.
 
 **Errors**
 
@@ -56,7 +56,9 @@ Same shape and cases as `POST /api/v1/learnings/task` above (missing/invalid aut
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the video's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/videos/completion`
 
@@ -93,7 +95,7 @@ Marks a video complete for the caller and awards its XP. Same idempotency behavi
 }
 ```
 
-`completed`/`completed_at`/`xp_awarded` follow the same rules as `docs/api/materials.md`'s `completion`, including the level-unlock requirement.
+`completed`/`completed_at`/`xp_awarded` follow the same rules as `docs/api/materials.md`'s `completion`, including the chapter-lock requirement.
 
 **Errors**
 
@@ -103,4 +105,6 @@ Same shape and cases as `POST /api/v1/learnings/task` above (missing/invalid aut
 |---|---|---|---|
 | 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
-| 403 | `FORBIDDEN` | `This level hasn't been unlocked yet.` | the video's `level_number` is above the caller's `lms_accesses.current_level_id` level number |
+| 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
+| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
+| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |

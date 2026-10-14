@@ -2,16 +2,15 @@ package com.ailene.lms.chaptertest;
 
 import com.ailene.lms.access.Access;
 import com.ailene.lms.access.AccessRepository;
-import com.ailene.lms.access.StudentStatusProjection;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.chapter.Chapter;
+import com.ailene.lms.chapter.ChapterAccessGuard;
+import com.ailene.lms.chapter.ChapterLockedReason;
 import com.ailene.lms.chapter.ChapterRepository;
 import com.ailene.lms.common.Status;
 import com.ailene.lms.common.exception.ConflictException;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
-import com.ailene.lms.level.Level;
-import com.ailene.lms.level.LevelRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,11 +46,11 @@ class ChapterTestServiceTest {
     @Mock
     private ChapterRepository chapterRepository;
     @Mock
-    private LevelRepository levelRepository;
-    @Mock
     private ChapterTestRepository chapterTestRepository;
     @Mock
     private ChapterTestSubmissionRepository chapterTestSubmissionRepository;
+    @Mock
+    private ChapterAccessGuard chapterAccessGuard;
 
     @InjectMocks
     private ChapterTestService chapterTestService;
@@ -67,19 +66,10 @@ class ChapterTestServiceTest {
         chapter.setName("Paham AI");
         lenient().when(chapterRepository.findById(5)).thenReturn(Optional.of(chapter));
 
-        Level level = new Level();
-        level.setId(1);
-        level.setLevelNumber((short) 1);
-        lenient().when(levelRepository.findById(1)).thenReturn(Optional.of(level));
-
         Access access = new Access();
         access.setId("access-1");
         access.setProjectId("proj-1");
         lenient().when(accessRepository.findByUserIdAndProjectId(USER_ID, "proj-1")).thenReturn(Optional.of(access));
-
-        StudentStatusProjection status = mock(StudentStatusProjection.class);
-        lenient().when(status.getCurrentLevelNumber()).thenReturn((short) 1);
-        lenient().when(accessRepository.findStudentStatus(USER_ID, "proj-1")).thenReturn(Optional.of(status));
     }
 
     private void givenTest(int id, ChapterTestKind kind) {
@@ -121,6 +111,42 @@ class ChapterTestServiceTest {
         lenient().when(row.getOptionText()).thenReturn(code);
         lenient().when(row.getOptionIsCorrect()).thenReturn(correct);
         return row;
+    }
+
+    private void givenChapterLocked(ChapterLockedReason reason) {
+        when(chapterAccessGuard.requireUnlocked(5, "access-1"))
+                .thenThrow(new ForbiddenException(ChapterAccessGuard.message(reason)));
+    }
+
+    @Test
+    void detailsOfALockedChapterAreForbidden() {
+        givenTest(10, ChapterTestKind.pre_test);
+        givenChapterLocked(ChapterLockedReason.session_not_started);
+
+        assertThatThrownBy(() -> chapterTestService.getDetails("jwt", new ChapterTestDetailsRequest(10)))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("This chapter opens when its session starts.");
+    }
+
+    @Test
+    void submitToALockedChapterIsForbiddenAndStoresNothing() {
+        givenTest(10, ChapterTestKind.pre_test);
+        givenChapterLocked(ChapterLockedReason.admin_locked);
+
+        assertThatThrownBy(() -> chapterTestService.submit("jwt",
+                new ChapterTestSubmitRequest(10, Map.of("1", "A"))))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("This chapter has been locked by an admin.");
+        verify(chapterTestSubmissionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void resultOfALockedChapterIsForbidden() {
+        givenTest(10, ChapterTestKind.pre_test);
+        givenChapterLocked(ChapterLockedReason.admin_locked);
+
+        assertThatThrownBy(() -> chapterTestService.getResult("jwt", new ChapterTestResultRequest(10)))
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
