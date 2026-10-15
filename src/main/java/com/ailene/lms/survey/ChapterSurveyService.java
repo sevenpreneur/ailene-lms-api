@@ -59,10 +59,18 @@ public class ChapterSurveyService {
         survey.setStudentAccessId(access.getId());
         survey.setChapterId(chapter.getId());
         survey.setSessionId(session.getId());
-        survey.setSatisfaction(request.satisfaction());
-        survey.setRelevance(request.relevance());
-        survey.setTrainerRating(request.trainerRating());
-        survey.setComment(request.comment() == null || request.comment().isBlank() ? null : request.comment().trim());
+        survey.setTrainerClarity(request.trainerClarity());
+        survey.setTrainerMastery(request.trainerMastery());
+        survey.setTrainerResponsiveness(request.trainerResponsiveness());
+        survey.setTrainerEngagement(request.trainerEngagement());
+        survey.setMaterialRelevance(request.materialRelevance());
+        survey.setMaterialFlow(request.materialFlow());
+        survey.setMaterialDepth(request.materialDepth());
+        survey.setLearningValue(request.learningValue());
+        survey.setMissingTopics(blankToNull(request.missingTopics()));
+        survey.setFavoriteMaterial(blankToNull(request.favoriteMaterial()));
+        survey.setDislikedMaterial(blankToNull(request.dislikedMaterial()));
+        survey.setImprovementSuggestion(blankToNull(request.improvementSuggestion()));
         survey.setSubmittedAt(OffsetDateTime.now());
         try {
             survey = chapterSurveyRepository.saveAndFlush(survey);
@@ -79,6 +87,10 @@ public class ChapterSurveyService {
                 .orElse(null);
         boolean available = session != null && ChapterSchedule.lockedReason(session) == null;
         return new ChapterSurveyStatus(available, submittedAt != null, submittedAt);
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.trim();
     }
 
     private Chapter resolveChapter(Integer chapterId) {

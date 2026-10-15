@@ -1,6 +1,6 @@
 # Chapter surveys
 
-A short reaction survey (Kirkpatrick level 1) at the end of each chapter: three 1–5 ratings (overall satisfaction, relevance to the caller's work, and how well the trainer delivered the session) plus an optional comment, stored in `lms_chapter_surveys`, one row per access per chapter. The question wording lives in the client; the API stores the three numbers. Each row records the `lms_chapter_sessions` sitting the caller attended (the group-specific one if there is one, else the all-groups one), so `trainer_rating` can be read per session and therefore per trainer without joining the identity service's `trainers` table here. The survey opens once an admin has unlocked that session (`is_locked = false`; see Chapter lock in `docs/api/learnings.md`). Its state also shows up in `POST /api/v1/learnings/task` as `survey` (see `docs/api/learnings.md`). There is no aggregate/report endpoint yet.
+A reaction survey (Kirkpatrick level 1) at the end of each chapter, the same question set as Sevenpreneur's cohort check-out rating: eight 1–5 ratings, four about the trainer (`trainer_clarity`, `trainer_mastery`, `trainer_responsiveness`, `trainer_engagement`) and four about the material (`material_relevance`, `material_flow`, `material_depth`, `learning_value`), plus four optional open answers (`favorite_material`, `missing_topics`, `disliked_material`, `improvement_suggestion`), stored in `lms_chapter_surveys`, one row per access per chapter. The question wording lives in the client; the API stores the answers. Each row records the `lms_chapter_sessions` sitting the caller attended (the group-specific one if there is one, else the all-groups one), so the `trainer_*` ratings can be read per session and therefore per trainer without joining the identity service's `trainers` table here. The survey opens once an admin has unlocked that session (`is_locked = false`; see Chapter lock in `docs/api/learnings.md`). Its state also shows up in `POST /api/v1/learnings/task` as `survey` (see `docs/api/learnings.md`). There is no aggregate/report endpoint yet.
 
 ## Endpoints
 
@@ -78,20 +78,36 @@ Stores the caller's one survey answer for a chapter.
 ```json
 {
   "chapter_id": 5,
-  "satisfaction": 5,
-  "relevance": 4,
-  "trainer_rating": 5,
-  "comment": "Contoh kasusnya pas dengan kerjaan tim kami."
+  "trainer_clarity": 5,
+  "trainer_mastery": 5,
+  "trainer_responsiveness": 4,
+  "trainer_engagement": 5,
+  "material_relevance": 4,
+  "material_flow": 4,
+  "material_depth": 3,
+  "learning_value": 5,
+  "favorite_material": "Contoh kasusnya pas dengan kerjaan tim kami.",
+  "missing_topics": "Lebih banyak latihan praktik.",
+  "disliked_material": null,
+  "improvement_suggestion": ""
 }
 ```
 
 | Field | Type | Required |
 |---|---|---|
 | `chapter_id` | integer | yes |
-| `satisfaction` | integer 1–5 | yes |
-| `relevance` | integer 1–5 | yes |
-| `trainer_rating` | integer 1–5 | yes |
-| `comment` | string, max 2000 | no |
+| `trainer_clarity` | integer 1–5 | yes |
+| `trainer_mastery` | integer 1–5 | yes |
+| `trainer_responsiveness` | integer 1–5 | yes |
+| `trainer_engagement` | integer 1–5 | yes |
+| `material_relevance` | integer 1–5 | yes |
+| `material_flow` | integer 1–5 | yes |
+| `material_depth` | integer 1–5 | yes |
+| `learning_value` | integer 1–5 | yes |
+| `favorite_material` | string, max 2000 | no |
+| `missing_topics` | string, max 2000 | no |
+| `disliked_material` | string, max 2000 | no |
+| `improvement_suggestion` | string, max 2000 | no |
 
 **Response** — `201 Created`
 
@@ -102,16 +118,24 @@ Stores the caller's one survey answer for a chapter.
   "status": "CREATED",
   "message": "chapter survey submitted successfully",
   "data": {
-    "satisfaction": 5,
-    "relevance": 4,
-    "trainer_rating": 5,
-    "comment": "Contoh kasusnya pas dengan kerjaan tim kami.",
+    "trainer_clarity": 5,
+    "trainer_mastery": 5,
+    "trainer_responsiveness": 4,
+    "trainer_engagement": 5,
+    "material_relevance": 4,
+    "material_flow": 4,
+    "material_depth": 3,
+    "learning_value": 5,
+    "missing_topics": "Lebih banyak latihan praktik.",
+    "favorite_material": "Contoh kasusnya pas dengan kerjaan tim kami.",
+    "disliked_material": null,
+    "improvement_suggestion": null,
     "submitted_at": "2026-10-13T09:30:00.000Z"
   }
 }
 ```
 
-A blank `comment` is stored as `null`. Answers can't be edited after submitting. No XP is awarded.
+A missing or blank open answer is stored as `null`, and the rest are trimmed. Answers can't be edited after submitting. No XP is awarded.
 
 **Errors**
 
@@ -119,6 +143,6 @@ Same auth, `403` chapter lock and `404` cases as `details` above, plus:
 
 | Code | Status | Message | When |
 |---|---|---|---|
-| 400 | `BAD_REQUEST` | `satisfaction: must be less than or equal to 5` | a rating outside 1–5 (same for `relevance`/`trainerRating`, and `must not be null` when missing) |
-| 400 | `BAD_REQUEST` | `comment: size must be between 0 and 2000` | comment too long |
+| 400 | `BAD_REQUEST` | `trainerClarity: must be less than or equal to 5` | a rating outside 1–5 (same for every rating, and `must not be null` when one is missing) |
+| 400 | `BAD_REQUEST` | `missingTopics: size must be between 0 and 2000` | an open answer longer than 2000 characters (same for the other three) |
 | 409 | `CONFLICT` | `You already submitted the survey for this chapter.` | the caller already answered this chapter |

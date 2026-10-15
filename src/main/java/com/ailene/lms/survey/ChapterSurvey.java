@@ -30,21 +30,45 @@ public class ChapterSurvey {
     @Column(name = "chapter_id", nullable = false)
     private Integer chapterId;
 
-    // the sitting being rated, which is what ties trainer_rating to a trainer
+    // the sitting being rated, which is what ties the trainer_* ratings to a trainer
     @Column(name = "session_id", nullable = false)
     private Integer sessionId;
 
-    @Column(nullable = false)
-    private Short satisfaction;
+    @Column(name = "trainer_clarity", nullable = false)
+    private Short trainerClarity;
 
-    @Column(nullable = false)
-    private Short relevance;
+    @Column(name = "trainer_mastery", nullable = false)
+    private Short trainerMastery;
 
-    @Column(name = "trainer_rating", nullable = false)
-    private Short trainerRating;
+    @Column(name = "trainer_responsiveness", nullable = false)
+    private Short trainerResponsiveness;
 
-    @Column
-    private String comment;
+    @Column(name = "trainer_engagement", nullable = false)
+    private Short trainerEngagement;
+
+    @Column(name = "material_relevance", nullable = false)
+    private Short materialRelevance;
+
+    @Column(name = "material_flow", nullable = false)
+    private Short materialFlow;
+
+    @Column(name = "material_depth", nullable = false)
+    private Short materialDepth;
+
+    @Column(name = "learning_value", nullable = false)
+    private Short learningValue;
+
+    @Column(name = "missing_topics")
+    private String missingTopics;
+
+    @Column(name = "favorite_material")
+    private String favoriteMaterial;
+
+    @Column(name = "disliked_material")
+    private String dislikedMaterial;
+
+    @Column(name = "improvement_suggestion")
+    private String improvementSuggestion;
 
     @Column(name = "submitted_at", nullable = false)
     private OffsetDateTime submittedAt;

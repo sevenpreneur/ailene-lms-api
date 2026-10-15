@@ -71,8 +71,9 @@ class ChapterSurveyServiceTest {
         return session;
     }
 
-    private static ChapterSurveySubmitRequest request(String comment) {
-        return new ChapterSurveySubmitRequest(5, (short) 5, (short) 4, (short) 3, comment);
+    private static ChapterSurveySubmitRequest request(String missingTopics) {
+        return new ChapterSurveySubmitRequest(5, (short) 5, (short) 4, (short) 3, (short) 4, (short) 5, (short) 4,
+                (short) 3, (short) 5, missingTopics, "  Studi kasusnya  ", null, "");
     }
 
     @Test
@@ -108,7 +109,7 @@ class ChapterSurveyServiceTest {
     }
 
     @Test
-    void storesTheRatingsAgainstTheSessionAndDropsABlankComment() {
+    void storesTheRatingsAgainstTheSessionAndDropsBlankAnswers() {
         givenCaller();
         when(chapterAccessGuard.requireUnlocked(5, "access-1")).thenReturn(session(Duration.ofHours(-1), false));
         when(chapterSurveyRepository.findByStudentAccessIdAndChapterId("access-1", 5)).thenReturn(Optional.empty());
@@ -119,8 +120,12 @@ class ChapterSurveyServiceTest {
         ArgumentCaptor<ChapterSurvey> saved = ArgumentCaptor.forClass(ChapterSurvey.class);
         verify(chapterSurveyRepository).saveAndFlush(saved.capture());
         assertThat(saved.getValue().getSessionId()).isEqualTo(77);
-        assertThat(saved.getValue().getTrainerRating()).isEqualTo((short) 3);
-        assertThat(answer.comment()).isNull();
+        assertThat(saved.getValue().getTrainerResponsiveness()).isEqualTo((short) 3);
+        assertThat(saved.getValue().getLearningValue()).isEqualTo((short) 5);
+        assertThat(answer.missingTopics()).isNull();
+        assertThat(answer.favoriteMaterial()).isEqualTo("Studi kasusnya");
+        assertThat(answer.dislikedMaterial()).isNull();
+        assertThat(answer.improvementSuggestion()).isNull();
         assertThat(answer.submittedAt()).isNotNull();
     }
 

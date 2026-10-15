@@ -465,15 +465,23 @@ CREATE TABLE lms_chapter_test_submissions (
 );
 
 CREATE TABLE lms_chapter_surveys (
-  id                 SERIAL       PRIMARY KEY,
-  student_access_id  CHAR(21)     NOT NULL,
-  chapter_id         INTEGER      NOT NULL,
-  session_id         INTEGER      NOT NULL,
-  satisfaction       SMALLINT     NOT NULL  CHECK (satisfaction BETWEEN 1 AND 5),
-  relevance          SMALLINT     NOT NULL  CHECK (relevance BETWEEN 1 AND 5),
-  trainer_rating     SMALLINT     NOT NULL  CHECK (trainer_rating BETWEEN 1 AND 5),
-  comment            TEXT             NULL,
-  submitted_at       TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  id                       SERIAL       PRIMARY KEY,
+  student_access_id        CHAR(21)     NOT NULL,
+  chapter_id               INTEGER      NOT NULL,
+  session_id               INTEGER      NOT NULL,
+  trainer_clarity          SMALLINT     NOT NULL  CHECK (trainer_clarity BETWEEN 1 AND 5),
+  trainer_mastery          SMALLINT     NOT NULL  CHECK (trainer_mastery BETWEEN 1 AND 5),
+  trainer_responsiveness   SMALLINT     NOT NULL  CHECK (trainer_responsiveness BETWEEN 1 AND 5),
+  trainer_engagement       SMALLINT     NOT NULL  CHECK (trainer_engagement BETWEEN 1 AND 5),
+  material_relevance       SMALLINT     NOT NULL  CHECK (material_relevance BETWEEN 1 AND 5),
+  material_flow            SMALLINT     NOT NULL  CHECK (material_flow BETWEEN 1 AND 5),
+  material_depth           SMALLINT     NOT NULL  CHECK (material_depth BETWEEN 1 AND 5),
+  learning_value           SMALLINT     NOT NULL  CHECK (learning_value BETWEEN 1 AND 5),
+  missing_topics           TEXT             NULL,
+  favorite_material        TEXT             NULL,
+  disliked_material        TEXT             NULL,
+  improvement_suggestion   TEXT             NULL,
+  submitted_at             TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (student_access_id, chapter_id)
 );
 
