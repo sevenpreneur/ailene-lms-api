@@ -29,6 +29,9 @@ import com.ailene.lms.usecase.UseCaseCategoryProjection;
 import com.ailene.lms.usecase.UseCaseRepository;
 import com.ailene.lms.video.VideoFocusProjection;
 import com.ailene.lms.video.VideoRepository;
+import com.ailene.lms.video.VideoTaskProjection;
+import com.ailene.lms.video.VideoTimestampItem;
+import com.ailene.lms.video.VideoTimestampProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -66,8 +69,14 @@ public class LearningsService {
         List<QuizTaskItem> quizzes = quizRepository.findQuizTasks(request.chapterId(), access.getId()).stream()
                 .map(QuizTaskItem::from)
                 .toList();
-        List<VideoTaskItem> videos = videoRepository.findVideoTasks(request.chapterId(), access.getId()).stream()
-                .map(VideoTaskItem::from)
+        List<VideoTaskProjection> videoRows = videoRepository.findVideoTasks(request.chapterId(), access.getId());
+        Map<Integer, List<VideoTimestampItem>> timestampsByVideo = videoRows.isEmpty() ? Map.of()
+                : videoRepository.findTimestamps(videoRows.stream().map(VideoTaskProjection::getId).toList())
+                        .stream()
+                        .collect(Collectors.groupingBy(VideoTimestampProjection::getVideoId,
+                                Collectors.mapping(VideoTimestampItem::from, Collectors.toList())));
+        List<VideoTaskItem> videos = videoRows.stream()
+                .map(row -> VideoTaskItem.from(row, timestampsByVideo.getOrDefault(row.getId(), List.of())))
                 .toList();
         List<MaterialTaskItem> materials = materialRepository.findMaterialTasks(request.chapterId(), access.getId())
                 .stream()

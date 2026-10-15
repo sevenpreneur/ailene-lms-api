@@ -10,6 +10,7 @@ import com.ailene.lms.chapter.ChapterListProjection;
 import com.ailene.lms.chapter.ChapterLockedReason;
 import com.ailene.lms.chapter.ChapterRepository;
 import com.ailene.lms.chaptertest.ChapterTestService;
+import com.ailene.lms.chaptertest.ChapterTestTasks;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.level.LevelRepository;
 import com.ailene.lms.material.MaterialFocusProjection;
@@ -19,6 +20,9 @@ import com.ailene.lms.quiz.QuizRepository;
 import com.ailene.lms.survey.ChapterSurveyService;
 import com.ailene.lms.usecase.UseCaseRepository;
 import com.ailene.lms.video.VideoRepository;
+import com.ailene.lms.video.VideoTaskProjection;
+import com.ailene.lms.video.VideoTimestampItem;
+import com.ailene.lms.video.VideoTimestampProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +38,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -122,6 +127,51 @@ class LearningsServiceTest {
         assertThat(chapters).extracting(ChapterListItem::lockedReason).containsExactly(null, null,
                 ChapterLockedReason.admin_locked);
         assertThat(chapters.get(1).sessionDate().toInstant()).isEqualTo(FUTURE);
+    }
+
+    private static VideoTaskProjection video(int id) {
+        VideoTaskProjection row = mock(VideoTaskProjection.class);
+        lenient().when(row.getId()).thenReturn(id);
+        return row;
+    }
+
+    private static VideoTimestampProjection timestamp(int videoId, int startSeconds, String title) {
+        VideoTimestampProjection row = mock(VideoTimestampProjection.class);
+        lenient().when(row.getVideoId()).thenReturn(videoId);
+        lenient().when(row.getStartSeconds()).thenReturn(startSeconds);
+        lenient().when(row.getTitle()).thenReturn(title);
+        return row;
+    }
+
+    private void openChapter5() {
+        Chapter chapter = new Chapter();
+        chapter.setId(5);
+        chapter.setProjectId("proj-1");
+        when(chapterRepository.findById(5)).thenReturn(Optional.of(chapter));
+        when(chapterTestService.findTasks(5, "access-1")).thenReturn(new ChapterTestTasks(null, null));
+    }
+
+    @Test
+    void taskAttachesEachVideosOwnTimestamps() {
+        openChapter5();
+        List<VideoTaskProjection> videoRows = List.of(video(7), video(8));
+        List<VideoTimestampProjection> timestampRows = List.of(timestamp(7, 0, "Intro"), timestamp(7, 212, "Bagian 1"));
+        when(videoRepository.findVideoTasks(5, "access-1")).thenReturn(videoRows);
+        when(videoRepository.findTimestamps(List.of(7, 8))).thenReturn(timestampRows);
+
+        List<VideoTaskItem> videos = learningsService.getTasks("jwt", new LearningsRequest(5)).videos();
+
+        assertThat(videos.get(0).timestamps()).containsExactly(
+                new VideoTimestampItem(0, "Intro"), new VideoTimestampItem(212, "Bagian 1"));
+        assertThat(videos.get(1).timestamps()).isEmpty();
+    }
+
+    @Test
+    void taskSkipsTheTimestampQueryWithoutVideos() {
+        openChapter5();
+
+        assertThat(learningsService.getTasks("jwt", new LearningsRequest(5)).videos()).isEmpty();
+        verify(videoRepository, never()).findTimestamps(any());
     }
 
     @Test

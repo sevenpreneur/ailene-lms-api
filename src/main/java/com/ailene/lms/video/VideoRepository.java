@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface VideoRepository extends JpaRepository<Video, Integer> {
@@ -25,6 +26,16 @@ public interface VideoRepository extends JpaRepository<Video, Integer> {
             ORDER BY v.order_index ASC
             """, nativeQuery = true)
     List<VideoTaskProjection> findVideoTasks(@Param("chapterId") Integer chapterId, @Param("accessId") String accessId);
+
+    @Query(value = """
+            SELECT t.video_id AS videoId,
+                   t.start_seconds AS startSeconds,
+                   t.title AS title
+            FROM lms_video_timestamps t
+            WHERE t.video_id IN (:videoIds)
+            ORDER BY t.video_id ASC, t.start_seconds ASC
+            """, nativeQuery = true)
+    List<VideoTimestampProjection> findTimestamps(@Param("videoIds") Collection<Integer> videoIds);
 
     @Query(value = """
             SELECT (SELECT vc.completed_at FROM lms_video_completions vc

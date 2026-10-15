@@ -225,6 +225,15 @@ CREATE TABLE lms_videos (
   updated_at   TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE lms_video_timestamps (
+  id             SERIAL       PRIMARY KEY,
+  video_id       INTEGER      NOT NULL,
+  start_seconds  INTEGER      NOT NULL  CHECK (start_seconds >= 0),
+  title          VARCHAR      NOT NULL,
+  created_at     TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (video_id, start_seconds)
+);
+
 CREATE TABLE lms_quizzes (
   id           VARCHAR      PRIMARY KEY,
   chapter_id   INTEGER      NOT NULL,
@@ -670,6 +679,9 @@ ALTER TABLE lms_materials
 
 ALTER TABLE lms_videos
   ADD FOREIGN KEY (chapter_id) REFERENCES lms_chapters (id);
+
+ALTER TABLE lms_video_timestamps
+  ADD FOREIGN KEY (video_id) REFERENCES lms_videos (id);
 
 ALTER TABLE lms_quizzes
   ADD FOREIGN KEY (chapter_id) REFERENCES lms_chapters (id);
