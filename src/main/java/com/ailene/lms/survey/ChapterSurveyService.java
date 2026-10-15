@@ -16,7 +16,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -78,7 +77,7 @@ public class ChapterSurveyService {
         OffsetDateTime submittedAt = chapterSurveyRepository.findByStudentAccessIdAndChapterId(accessId, chapterId)
                 .map(ChapterSurvey::getSubmittedAt)
                 .orElse(null);
-        boolean available = session != null && ChapterSchedule.lockedReason(session, Instant.now()) == null;
+        boolean available = session != null && ChapterSchedule.lockedReason(session) == null;
         return new ChapterSurveyStatus(available, submittedAt != null, submittedAt);
     }
 

@@ -79,7 +79,7 @@ class ChapterSurveyServiceTest {
     void refusedWhileTheChapterIsLocked() {
         givenCaller();
         when(chapterAccessGuard.requireUnlocked(5, "access-1")).thenThrow(
-                new ForbiddenException(ChapterAccessGuard.message(ChapterLockedReason.session_not_started)));
+                new ForbiddenException(ChapterAccessGuard.message(ChapterLockedReason.admin_locked)));
 
         assertThatThrownBy(() -> chapterSurveyService.submit("jwt", request(null)))
                 .isInstanceOf(ForbiddenException.class);
@@ -134,9 +134,9 @@ class ChapterSurveyServiceTest {
     }
 
     @Test
-    void statusIsAvailableOnceAnUnlockedSessionHasStarted() {
+    void statusIsAvailableForAnUnlockedSessionEvenBeforeItsDate() {
         when(chapterAccessGuard.findSession(5, "access-1"))
-                .thenReturn(Optional.of(session(Duration.ofHours(-1), false)));
+                .thenReturn(Optional.of(session(Duration.ofHours(1), false)));
         when(chapterSurveyRepository.findByStudentAccessIdAndChapterId("access-1", 5)).thenReturn(Optional.empty());
 
         assertThat(chapterSurveyService.findStatus(5, "access-1").available()).isTrue();

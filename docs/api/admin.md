@@ -230,7 +230,7 @@ Sets or clears the admin lock on one chapter session.
 
 **Response** — `200 OK`, `data` is the updated session (same shape as one entry of the list above), message `chapter session updated successfully`.
 
-While `is_locked` is `true`, the chapter is locked for everyone that session applies to, even after `session_date` (see Chapter lock in `docs/api/learnings.md`). Only this one row changes. A group whose own session targets the chapter keeps following that session, so locking a group-specific session affects only that group, and locking the all-groups session leaves groups with their own session alone. Setting the value it already has is not an error.
+`is_locked` is the only thing that opens or closes a chapter: while it is `true`, the chapter is locked for everyone that session applies to, and setting it to `false` opens it right away, whatever `session_date` says (see Chapter lock in `docs/api/learnings.md`). A new session starts locked (`is_locked` defaults to `true`). Only this one row changes. A group whose own session targets the chapter keeps following that session, so locking a group-specific session affects only that group, and locking the all-groups session leaves groups with their own session alone. Setting the value it already has is not an error.
 
 **Errors**
 

@@ -1,6 +1,6 @@
 # Chapter surveys
 
-A short reaction survey (Kirkpatrick level 1) at the end of each chapter: three 1–5 ratings (overall satisfaction, relevance to the caller's work, and how well the trainer delivered the session) plus an optional comment, stored in `lms_chapter_surveys`, one row per access per chapter. The question wording lives in the client; the API stores the three numbers. Each row records the `lms_chapter_sessions` sitting the caller attended (the group-specific one if there is one, else the all-groups one), so `trainer_rating` can be read per session and therefore per trainer without joining the identity service's `trainers` table here. The survey opens once the chapter is unlocked for the caller: that session's `session_date` has passed and it isn't admin-locked (see Chapter lock in `docs/api/learnings.md`). Its state also shows up in `POST /api/v1/learnings/task` as `survey` (see `docs/api/learnings.md`). There is no aggregate/report endpoint yet.
+A short reaction survey (Kirkpatrick level 1) at the end of each chapter: three 1–5 ratings (overall satisfaction, relevance to the caller's work, and how well the trainer delivered the session) plus an optional comment, stored in `lms_chapter_surveys`, one row per access per chapter. The question wording lives in the client; the API stores the three numbers. Each row records the `lms_chapter_sessions` sitting the caller attended (the group-specific one if there is one, else the all-groups one), so `trainer_rating` can be read per session and therefore per trainer without joining the identity service's `trainers` table here. The survey opens once an admin has unlocked that session (`is_locked = false`; see Chapter lock in `docs/api/learnings.md`). Its state also shows up in `POST /api/v1/learnings/task` as `survey` (see `docs/api/learnings.md`). There is no aggregate/report endpoint yet.
 
 ## Endpoints
 
@@ -52,8 +52,7 @@ All error responses share the shape `{ "success": false, "code", "status", "mess
 | 401 | `UNAUTHORIZED` | `Session not found or already ended` | the JWT is valid, but no matching `lms_tokens` row is active |
 | 400 | `BAD_REQUEST` | `chapterId: must not be null` | missing `chapter_id` |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 | 404 | `NOT_FOUND` | `Chapter not found` | no `lms_chapters` row matches `chapter_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the chapter's project |
 

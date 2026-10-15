@@ -18,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,12 +86,10 @@ class MaterialServiceTest {
                 .thenThrow(new ForbiddenException(ChapterAccessGuard.message(reason)));
     }
 
-    private static LevelMaterialProjection levelRow(String id, Instant sessionDate, Boolean sessionLocked,
-            boolean completed) {
+    private static LevelMaterialProjection levelRow(String id, Boolean sessionLocked, boolean completed) {
         LevelMaterialProjection row = mock(LevelMaterialProjection.class);
         when(row.getMaterialId()).thenReturn(id);
         when(row.getMaterialTitle()).thenReturn(id.toUpperCase());
-        when(row.getSessionDate()).thenReturn(sessionDate);
         lenient().when(row.getSessionLocked()).thenReturn(sessionLocked);
         when(row.getCompleted()).thenReturn(completed);
         return row;
@@ -113,13 +110,13 @@ class MaterialServiceTest {
     }
 
     @Test
-    void materialDetails_sessionNotStarted_throwsForbidden() {
+    void materialDetails_lockedChapter_throwsForbidden() {
         givenMaterial("mat-1");
-        givenChapterLocked(ChapterLockedReason.session_not_started);
+        givenChapterLocked(ChapterLockedReason.admin_locked);
 
         assertThatThrownBy(() -> materialService.getMaterialDetails("jwt", new MaterialDetailsRequest("mat-1")))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter opens when its session starts.");
+                .hasMessage("This chapter is locked until an admin opens it.");
     }
 
     @Test
@@ -129,7 +126,7 @@ class MaterialServiceTest {
 
         assertThatThrownBy(() -> materialService.completeMaterial("jwt", new MaterialCompletionRequest("mat-1")))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter has been locked by an admin.");
+                .hasMessage("This chapter is locked until an admin opens it.");
         verify(materialRepository, never()).insertCompletion(anyString(), anyString());
         verify(materialRepository, never()).insertXpEarning(anyString(), anyString(), any());
     }
@@ -166,18 +163,17 @@ class MaterialServiceTest {
     }
 
     @Test
-    void levelMaterials_locksUnstartedAndAdminLockedSessionsOnly() {
+    void levelMaterials_locksAdminLockedSessionsOnly() {
         givenMaterial("mat-1");
         Level level = new Level();
         level.setId(1);
         level.setLevelNumber((short) 2);
         when(levelRepository.findById(1)).thenReturn(Optional.of(level));
 
-        Instant yesterday = Instant.now().minus(1, ChronoUnit.DAYS);
-        LevelMaterialProjection open = levelRow("mat-1", yesterday, false, true);
-        LevelMaterialProjection future = levelRow("mat-2", Instant.now().plus(1, ChronoUnit.DAYS), false, false);
-        LevelMaterialProjection adminLocked = levelRow("mat-3", yesterday, true, false);
-        when(materialRepository.findLevelMaterials(1, "access-1")).thenReturn(List.of(open, future, adminLocked));
+        LevelMaterialProjection open = levelRow("mat-1", false, true);
+        LevelMaterialProjection alsoOpen = levelRow("mat-2", false, false);
+        LevelMaterialProjection adminLocked = levelRow("mat-3", true, false);
+        when(materialRepository.findLevelMaterials(1, "access-1")).thenReturn(List.of(open, alsoOpen, adminLocked));
 
         LevelMaterialsResponse response = materialService.getLevelMaterials("jwt",
                 new LevelMaterialsRequest("mat-1"));
@@ -186,7 +182,7 @@ class MaterialServiceTest {
         assertThat(response.materials()).extracting(LevelMaterialItem::id)
                 .containsExactly("mat-1", "mat-2", "mat-3");
         assertThat(response.materials()).extracting(LevelMaterialItem::index).containsExactly(1, 2, 3);
-        assertThat(response.materials()).extracting(LevelMaterialItem::locked).containsExactly(false, true, true);
+        assertThat(response.materials()).extracting(LevelMaterialItem::locked).containsExactly(false, false, true);
         assertThat(response.materials()).extracting(LevelMaterialItem::isCurrent).containsExactly(true, false, false);
         assertThat(response.materials().get(0).completed()).isTrue();
     }

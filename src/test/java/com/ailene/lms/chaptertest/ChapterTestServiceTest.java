@@ -121,11 +121,11 @@ class ChapterTestServiceTest {
     @Test
     void detailsOfALockedChapterAreForbidden() {
         givenTest(10, ChapterTestKind.pre_test);
-        givenChapterLocked(ChapterLockedReason.session_not_started);
+        givenChapterLocked(ChapterLockedReason.admin_locked);
 
         assertThatThrownBy(() -> chapterTestService.getDetails("jwt", new ChapterTestDetailsRequest(10)))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter opens when its session starts.");
+                .hasMessage("This chapter is locked until an admin opens it.");
     }
 
     @Test
@@ -136,7 +136,7 @@ class ChapterTestServiceTest {
         assertThatThrownBy(() -> chapterTestService.submit("jwt",
                 new ChapterTestSubmitRequest(10, Map.of("1", "A"))))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter has been locked by an admin.");
+                .hasMessage("This chapter is locked until an admin opens it.");
         verify(chapterTestSubmissionRepository, never()).saveAndFlush(any());
     }
 

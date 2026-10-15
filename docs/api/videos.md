@@ -57,8 +57,7 @@ Same shape and cases as `POST /api/v1/learnings/task` above (missing/invalid aut
 | 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/videos/completion`
 
@@ -106,5 +105,4 @@ Same shape and cases as `POST /api/v1/learnings/task` above (missing/invalid aut
 | 404 | `NOT_FOUND` | `Video not found` | no `lms_videos` row matches `video_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the video's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |

@@ -68,8 +68,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/attempt`
 
@@ -138,8 +137,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/update`
 
@@ -184,8 +182,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 | 400 | `BAD_REQUEST` | `No active attempt. Start an attempt first.` | no non-finalized `lms_quiz_submissions` row exists for this `(access, quiz)` — call `attempt` first |
 
 ### `POST {base_url}/api/v1/quizzes/submit`
@@ -231,8 +228,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Quiz not found` | no `lms_quizzes` row matches `quiz_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/result`
 
@@ -301,8 +297,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the quiz's project |
 | 404 | `NOT_FOUND` | `Quiz submission not found` | the caller has no completed `lms_quiz_submissions` row for this quiz yet |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/quizzes/auto-submit` (internal)
 

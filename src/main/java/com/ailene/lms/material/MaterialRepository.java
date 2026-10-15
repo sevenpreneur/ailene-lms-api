@@ -32,8 +32,7 @@ public interface MaterialRepository extends JpaRepository<Material, String> {
             @Param("accessId") String accessId);
 
     @Query(value = """
-            SELECT s.session_date AS sessionDate,
-                   s.is_locked AS sessionLocked,
+            SELECT s.is_locked AS sessionLocked,
                    m.id AS materialId,
                    m.title AS materialTitle,
                    m.order_index AS orderIndex,

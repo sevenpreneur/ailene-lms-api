@@ -4,7 +4,6 @@ import com.ailene.lms.common.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.Optional;
 
 @Component
@@ -12,8 +11,7 @@ import java.util.Optional;
 public class ChapterAccessGuard {
 
     static final String NOT_SCHEDULED = "This chapter isn't scheduled for your group.";
-    static final String SESSION_NOT_STARTED = "This chapter opens when its session starts.";
-    static final String ADMIN_LOCKED = "This chapter has been locked by an admin.";
+    static final String ADMIN_LOCKED = "This chapter is locked until an admin opens it.";
 
     private final ChapterSessionRepository chapterSessionRepository;
 
@@ -24,7 +22,7 @@ public class ChapterAccessGuard {
     public ChapterSession requireUnlocked(Integer chapterId, String accessId) {
         ChapterSession session = findSession(chapterId, accessId)
                 .orElseThrow(() -> new ForbiddenException(NOT_SCHEDULED));
-        ChapterLockedReason reason = ChapterSchedule.lockedReason(session, Instant.now());
+        ChapterLockedReason reason = ChapterSchedule.lockedReason(session);
         if (reason != null) {
             throw new ForbiddenException(message(reason));
         }
@@ -33,7 +31,6 @@ public class ChapterAccessGuard {
 
     public static String message(ChapterLockedReason reason) {
         return switch (reason) {
-            case session_not_started -> SESSION_NOT_STARTED;
             case admin_locked -> ADMIN_LOCKED;
         };
     }

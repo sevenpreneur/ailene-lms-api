@@ -118,9 +118,9 @@ class LearningsServiceTest {
 
         List<ChapterListItem> chapters = learningsService.getChapters("jwt", new ChapterListRequest("proj-1"));
 
-        assertThat(chapters).extracting(ChapterListItem::locked).containsExactly(false, true, true);
-        assertThat(chapters).extracting(ChapterListItem::lockedReason).containsExactly(null,
-                ChapterLockedReason.session_not_started, ChapterLockedReason.admin_locked);
+        assertThat(chapters).extracting(ChapterListItem::locked).containsExactly(false, false, true);
+        assertThat(chapters).extracting(ChapterListItem::lockedReason).containsExactly(null, null,
+                ChapterLockedReason.admin_locked);
         assertThat(chapters.get(1).sessionDate().toInstant()).isEqualTo(FUTURE);
     }
 
@@ -135,7 +135,7 @@ class LearningsServiceTest {
 
         assertThatThrownBy(() -> learningsService.getTasks("jwt", new LearningsRequest(5)))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter has been locked by an admin.");
+                .hasMessage("This chapter is locked until an admin opens it.");
         verify(materialRepository, never()).findMaterialTasks(anyInt(), anyString());
     }
 
@@ -157,11 +157,11 @@ class LearningsServiceTest {
     }
 
     @Test
-    void todayFocusIsEmptyWhenEveryStartedSessionIsLocked() {
+    void todayFocusIsEmptyWhenEverySessionIsLocked() {
         StudentStatusProjection status = mock(StudentStatusProjection.class);
         when(status.getCurrentLevelNumber()).thenReturn((short) 1);
         when(accessRepository.findStudentStatus(USER_ID, "proj-1")).thenReturn(Optional.of(status));
-        List<ChapterListProjection> chapters = List.of(chapter(1, PAST, true), chapter(2, FUTURE, false));
+        List<ChapterListProjection> chapters = List.of(chapter(1, PAST, true), chapter(2, FUTURE, true));
         List<MaterialFocusProjection> materials = List.of(material(1, "mat-locked"), material(2, "mat-future"));
         when(chapterRepository.findChapterList("proj-1", "access-1")).thenReturn(chapters);
         when(materialRepository.findProjectMaterialsForFocus("proj-1", "access-1")).thenReturn(materials);

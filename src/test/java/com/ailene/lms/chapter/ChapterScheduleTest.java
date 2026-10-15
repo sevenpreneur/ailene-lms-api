@@ -23,37 +23,27 @@ class ChapterScheduleTest {
     }
 
     @Test
-    void lockedBeforeTheSessionDate() {
-        assertThat(ChapterSchedule.lockedReason(false, SESSION_DATE, SESSION_DATE.minusMillis(1)))
-                .isEqualTo(ChapterLockedReason.session_not_started);
+    void lockedWhileIsLockedIsSet() {
+        assertThat(ChapterSchedule.lockedReason(true)).isEqualTo(ChapterLockedReason.admin_locked);
     }
 
     @Test
-    void openExactlyAtTheSessionDate() {
-        assertThat(ChapterSchedule.lockedReason(false, SESSION_DATE, SESSION_DATE)).isNull();
+    void openOnceIsLockedIsCleared() {
+        assertThat(ChapterSchedule.lockedReason(false)).isNull();
     }
 
     @Test
-    void openAfterTheSessionDate() {
-        assertThat(ChapterSchedule.lockedReason(false, SESSION_DATE, SESSION_DATE.plus(Duration.ofDays(3)))).isNull();
+    void missingFlagCountsAsLocked() {
+        assertThat(ChapterSchedule.lockedReason((Boolean) null)).isEqualTo(ChapterLockedReason.admin_locked);
     }
 
     @Test
-    void adminLockHoldsAfterTheSessionDate() {
-        assertThat(ChapterSchedule.lockedReason(true, SESSION_DATE, SESSION_DATE.plus(Duration.ofDays(3))))
-                .isEqualTo(ChapterLockedReason.admin_locked);
-    }
+    void sessionDateNeverLocksOrOpens() {
+        Instant future = Instant.now().plus(Duration.ofDays(30));
+        Instant past = Instant.now().minus(Duration.ofDays(30));
 
-    @Test
-    void adminLockIsReportedOverAnUnstartedSession() {
-        assertThat(ChapterSchedule.lockedReason(true, SESSION_DATE, SESSION_DATE.minusSeconds(60)))
-                .isEqualTo(ChapterLockedReason.admin_locked);
-    }
-
-    @Test
-    void sessionOverloadReadsTheEntity() {
-        assertThat(ChapterSchedule.lockedReason(session(1, null, SESSION_DATE, false), SESSION_DATE)).isNull();
-        assertThat(ChapterSchedule.lockedReason(session(1, null, SESSION_DATE, true), SESSION_DATE))
+        assertThat(ChapterSchedule.lockedReason(session(1, null, future, false))).isNull();
+        assertThat(ChapterSchedule.lockedReason(session(1, null, past, true)))
                 .isEqualTo(ChapterLockedReason.admin_locked);
     }
 

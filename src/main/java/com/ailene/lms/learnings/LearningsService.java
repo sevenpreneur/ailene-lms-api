@@ -32,7 +32,6 @@ import com.ailene.lms.video.VideoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,9 +86,8 @@ public class LearningsService {
         Access access = accessRepository.findByUserIdAndProjectId(userId, request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("No access found for this project"));
 
-        Instant now = Instant.now();
         List<ChapterListProjection> rows = chapterRepository.findChapterList(request.projectId(), access.getId());
-        return rows.stream().map(row -> ChapterListItem.from(row, now)).toList();
+        return rows.stream().map(ChapterListItem::from).toList();
     }
 
     public List<LevelDto> getLevels(String jwt, LevelListRequest request) {
@@ -128,11 +126,10 @@ public class LearningsService {
 
         TodayFocusItem assignmentFocus = resolveAssignmentFocus(projectId, access.getId());
 
-        Instant now = Instant.now();
         TodayFocusItem focus = null;
         for (ChapterListProjection chapter : chapters) {
             if (chapter.getLevelNumber() > currentLevelNumber
-                    || ChapterSchedule.lockedReason(chapter.getSessionLocked(), chapter.getSessionDate(), now) != null) {
+                    || ChapterSchedule.lockedReason(chapter.getSessionLocked()) != null) {
                 continue;
             }
 

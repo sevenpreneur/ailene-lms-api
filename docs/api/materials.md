@@ -59,8 +59,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/materials/completion`
 
@@ -108,8 +107,7 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Material not found` | no `lms_materials` row matches `material_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ### `POST {base_url}/api/v1/materials/in-level`
 
@@ -161,7 +159,7 @@ Returns every active material in the same level as the given material — the "o
 }
 ```
 
-`material_id`'s chapter → level determines the level being listed; `level_number` is that level's number. `materials` covers every active material across every active chapter of that level, ordered by the chapter's `session_date` ascending then the material's `order_index` ascending, with `index` numbered sequentially across that whole ordering (not reset per chapter). `completed` comes from the caller's `lms_material_completions` rows. `locked` is the chapter lock for that material's chapter (see Chapter lock in `docs/api/learnings.md`): `true` while its applicable session hasn't reached `session_date` or has `is_locked = true`. The caller's current level is not part of it. The request's own `material_id` must be in an unlocked chapter, or the call answers `403`. `is_current` flags the material matching the request's `material_id`. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
+`material_id`'s chapter → level determines the level being listed; `level_number` is that level's number. `materials` covers every active material across every active chapter of that level, ordered by the chapter's `session_date` ascending then the material's `order_index` ascending, with `index` numbered sequentially across that whole ordering (not reset per chapter). `completed` comes from the caller's `lms_material_completions` rows. `locked` is the chapter lock for that material's chapter (see Chapter lock in `docs/api/learnings.md`): `true` while its applicable session has `is_locked = true`. The caller's current level is not part of it. The request's own `material_id` must be in an unlocked chapter, or the call answers `403`. `is_current` flags the material matching the request's `material_id`. `project_id` isn't part of the request — it's resolved internally from `material_id` via the material's chapter → level.
 
 **Errors**
 
@@ -173,5 +171,4 @@ Same shape and cases as `POST /api/v1/learnings/task` (missing/invalid auth, exp
 | 404 | `NOT_FOUND` | `Level not found` | the material's chapter references a level that no longer exists |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the material's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |

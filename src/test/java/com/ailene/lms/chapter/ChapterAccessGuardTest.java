@@ -42,21 +42,20 @@ class ChapterAccessGuardTest {
     }
 
     @Test
-    void unstartedSessionIsForbidden() {
-        givenSessions(session(1, null, FUTURE, false));
+    void unlockedSessionOpensBeforeItsSessionDate() {
+        ChapterSession open = session(1, null, FUTURE, false);
+        givenSessions(open);
 
-        assertThatThrownBy(() -> chapterAccessGuard.requireUnlocked(5, "access-1"))
-                .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter opens when its session starts.");
+        assertThat(chapterAccessGuard.requireUnlocked(5, "access-1")).isSameAs(open);
     }
 
     @Test
-    void adminLockedSessionIsForbiddenEvenAfterItStarted() {
+    void lockedSessionIsForbiddenEvenAfterItsSessionDate() {
         givenSessions(session(1, null, PAST, true));
 
         assertThatThrownBy(() -> chapterAccessGuard.requireUnlocked(5, "access-1"))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter has been locked by an admin.");
+                .hasMessage("This chapter is locked until an admin opens it.");
     }
 
     @Test
@@ -73,16 +72,7 @@ class ChapterAccessGuardTest {
 
         assertThatThrownBy(() -> chapterAccessGuard.requireUnlocked(5, "access-1"))
                 .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter has been locked by an admin.");
-    }
-
-    @Test
-    void unstartedGroupSessionWinsOverAStartedAllGroupsSession() {
-        givenSessions(session(1, null, PAST, false), session(2, 7, FUTURE, false));
-
-        assertThatThrownBy(() -> chapterAccessGuard.requireUnlocked(5, "access-1"))
-                .isInstanceOf(ForbiddenException.class)
-                .hasMessage("This chapter opens when its session starts.");
+                .hasMessage("This chapter is locked until an admin opens it.");
     }
 
     @Test

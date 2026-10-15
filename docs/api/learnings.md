@@ -4,15 +4,14 @@ Endpoints for the program's curriculum structure and content: a project's levels
 
 ## Chapter lock
 
-A chapter is locked for the caller unless its applicable session is open. The applicable session is the active `lms_chapter_sessions` row for the chapter that targets the caller's group (`only_group_id = lms_accesses.group_id`), or, if there is none, the active all-groups row (`only_group_id IS NULL`); the lowest `id` breaks a tie. The chapter is locked when no session applies, when the server's clock is still before that session's `session_date` (it opens exactly at `session_date`), or when that session has `is_locked = true`, an admin override set through `POST /api/v1/admin/chapter-sessions/lock` (see `docs/api/admin.md`). Because the group's own session wins, locking it never locks the chapter for other groups, and locking the all-groups session does not lock a group that has its own session. The caller's current level plays no part: level-based locking is the client's job.
+A chapter is locked for the caller unless its applicable session is open. The applicable session is the active `lms_chapter_sessions` row for the chapter that targets the caller's group (`only_group_id = lms_accesses.group_id`), or, if there is none, the active all-groups row (`only_group_id IS NULL`); the lowest `id` breaks a tie. The chapter is locked when no session applies or while that session has `is_locked = true`, which is the default for a new session; an admin opens it with `POST /api/v1/admin/chapter-sessions/lock` (see `docs/api/admin.md`). `session_date` is informational only and never locks or opens a chapter. Because the group's own session wins, locking it never locks the chapter for other groups, and locking the all-groups session does not lock a group that has its own session. The caller's current level plays no part: level-based locking is the client's job.
 
 `chapters` reports the lock per chapter and `today-focus` skips locked chapters. `task` and every material, video, quiz, chapter test and chapter survey endpoint that reads or writes a chapter's content answer a locked chapter with one of these, whatever the caller's role:
 
 | Code | Status | Message | When |
 |---|---|---|---|
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 ## Endpoints
 
@@ -117,13 +116,13 @@ Returns a project's active chapters, ordered by `session_date` ascending, each a
       "total_tasks": 5,
       "progress": "not_started",
       "locked": true,
-      "locked_reason": "session_not_started"
+      "locked_reason": "admin_locked"
     }
   ]
 }
 ```
 
-`total_tasks` is the number of active quizzes + videos + materials in that chapter. `done_tasks` counts the caller's own completed items among those (a quiz counts once it has any `is_completed` submission, videos/materials count via `lms_video_completions`/`lms_material_completions`). `progress` is derived: `not_started` when nothing's done, `completed` when `done_tasks >= total_tasks`, otherwise `in_progress`. Only chapters whose level belongs to `project_id` are returned; inactive chapters are excluded, and so are chapters with no session for the caller's group. `session_date`, `duration_minutes`, `location_*` and `method` come from the applicable session (see Chapter lock above). `locked` is that rule's result for the caller at the server's current time, and `locked_reason` says why: `admin_locked` when the session has `is_locked = true` (reported even before `session_date`), `session_not_started` when `session_date` is still ahead, `null` when the chapter is open.
+`total_tasks` is the number of active quizzes + videos + materials in that chapter. `done_tasks` counts the caller's own completed items among those (a quiz counts once it has any `is_completed` submission, videos/materials count via `lms_video_completions`/`lms_material_completions`). `progress` is derived: `not_started` when nothing's done, `completed` when `done_tasks >= total_tasks`, otherwise `in_progress`. Only chapters whose level belongs to `project_id` are returned; inactive chapters are excluded, and so are chapters with no session for the caller's group. `session_date`, `duration_minutes`, `location_*` and `method` come from the applicable session (see Chapter lock above). `locked` is that rule's result for the caller, and `locked_reason` is `admin_locked` while the session has `is_locked = true`, `null` when the chapter is open.
 
 **Errors**
 
@@ -243,8 +242,7 @@ Same shape and cases as `levels` above (missing/invalid auth, expired session), 
 | 404 | `NOT_FOUND` | `Chapter not found` | no `lms_chapters` row matches `chapter_id` |
 | 404 | `NOT_FOUND` | `No access found for this project` | the caller has no `lms_accesses` row for the chapter's project |
 | 403 | `FORBIDDEN` | `This chapter isn't scheduled for your group.` | no active `lms_chapter_sessions` row applies to the caller's group (see Chapter lock in `docs/api/learnings.md`) |
-| 403 | `FORBIDDEN` | `This chapter opens when its session starts.` | the applicable session's `session_date` is still in the future |
-| 403 | `FORBIDDEN` | `This chapter has been locked by an admin.` | the applicable session has `is_locked = true` |
+| 403 | `FORBIDDEN` | `This chapter is locked until an admin opens it.` | the applicable session still has `is_locked = true` |
 
 Example error response (`404 Not Found`):
 
@@ -302,7 +300,7 @@ Returns the single next thing the caller should do in the project — the "today
 
 `data.focus` is `null` when there's nothing left to do (every unlocked chapter's tasks are complete and no assignment is pending). Otherwise `kind` is one of `material` / `quiz` / `video` / `prompt_practice` / `use_case_practice`, and `task_id` is always a string regardless of the underlying table's id type.
 
-Selection walks the project's active chapters in `session_date` order, skipping any chapter whose level is above the caller's current level and any chapter that is locked for the caller (session not started, or `is_locked = true` on its applicable session; see Chapter lock above). The level check here only picks a sensible next step; it is not an access lock. For the first eligible chapter, it picks — in this priority — the chapter's first incomplete material, else its first incomplete quiz, else the caller's nearest-deadline pending assignment (an `lms_prompt_submissions`/`lms_use_case_submissions` row with an assigner and a deadline but no submission yet, across the whole project, not just this chapter), else the chapter's first incomplete video, then stops. If no chapter yields anything, the nearest-deadline pending assignment (if any) is returned instead. `chapter_id`/`chapter_name`/`level_id`/`level_number` are `null` for `prompt_practice`/`use_case_practice` foci (those aren't chapter-scoped); `category` is that prompt/use case's first assigned category (`null` if it has none), and `assigned_by` is `null` for `material`/`quiz`/`video`.
+Selection walks the project's active chapters in `session_date` order, skipping any chapter whose level is above the caller's current level and any chapter that is locked for the caller (`is_locked = true` on its applicable session; see Chapter lock above). The level check here only picks a sensible next step; it is not an access lock. For the first eligible chapter, it picks — in this priority — the chapter's first incomplete material, else its first incomplete quiz, else the caller's nearest-deadline pending assignment (an `lms_prompt_submissions`/`lms_use_case_submissions` row with an assigner and a deadline but no submission yet, across the whole project, not just this chapter), else the chapter's first incomplete video, then stops. If no chapter yields anything, the nearest-deadline pending assignment (if any) is returned instead. `chapter_id`/`chapter_name`/`level_id`/`level_number` are `null` for `prompt_practice`/`use_case_practice` foci (those aren't chapter-scoped); `category` is that prompt/use case's first assigned category (`null` if it has none), and `assigned_by` is `null` for `material`/`quiz`/`video`.
 
 **Errors**
 

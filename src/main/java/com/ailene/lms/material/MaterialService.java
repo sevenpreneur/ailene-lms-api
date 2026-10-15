@@ -83,12 +83,11 @@ public class MaterialService {
         Level level = levelRepository.findById(chapter.getLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Level not found"));
 
-        Instant now = Instant.now();
         List<LevelMaterialItem> materials = new ArrayList<>();
         int index = 0;
         for (LevelMaterialProjection row : materialRepository.findLevelMaterials(level.getId(), access.getId())) {
             index++;
-            boolean locked = ChapterSchedule.lockedReason(row.getSessionLocked(), row.getSessionDate(), now) != null;
+            boolean locked = ChapterSchedule.lockedReason(row.getSessionLocked()) != null;
             materials.add(new LevelMaterialItem(row.getMaterialId(), row.getMaterialTitle(), index,
                     row.getCompleted(), locked, row.getMaterialId().equals(request.materialId())));
         }

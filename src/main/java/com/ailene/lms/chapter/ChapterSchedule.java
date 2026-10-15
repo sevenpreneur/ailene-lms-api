@@ -1,6 +1,5 @@
 package com.ailene.lms.chapter;
 
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -19,18 +18,12 @@ public final class ChapterSchedule {
         return applicable.stream().min(GROUP_SESSION_FIRST);
     }
 
-    public static ChapterLockedReason lockedReason(Boolean isLocked, Instant sessionDate, Instant now) {
-        if (Boolean.TRUE.equals(isLocked)) {
-            return ChapterLockedReason.admin_locked;
-        }
-        if (sessionDate == null || sessionDate.isAfter(now)) {
-            return ChapterLockedReason.session_not_started;
-        }
-        return null;
+    // Only the admin's is_locked decides; session_date is informational and never opens or closes a chapter.
+    public static ChapterLockedReason lockedReason(Boolean isLocked) {
+        return Boolean.FALSE.equals(isLocked) ? null : ChapterLockedReason.admin_locked;
     }
 
-    public static ChapterLockedReason lockedReason(ChapterSession session, Instant now) {
-        return lockedReason(session.getIsLocked(),
-                session.getSessionDate() == null ? null : session.getSessionDate().toInstant(), now);
+    public static ChapterLockedReason lockedReason(ChapterSession session) {
+        return lockedReason(session.getIsLocked());
     }
 }

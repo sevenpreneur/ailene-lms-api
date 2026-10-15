@@ -88,7 +88,7 @@ class VideoServiceTest {
     @Test
     void videoDetails_sessionNotStarted_throwsForbidden() {
         when(chapterAccessGuard.requireUnlocked(1, "access-1")).thenThrow(
-                new ForbiddenException(ChapterAccessGuard.message(ChapterLockedReason.session_not_started)));
+                new ForbiddenException(ChapterAccessGuard.message(ChapterLockedReason.admin_locked)));
 
         assertThatThrownBy(() -> videoService.getVideoDetails("jwt", new VideoDetailsRequest(1)))
                 .isInstanceOf(ForbiddenException.class);
