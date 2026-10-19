@@ -6,6 +6,7 @@ import com.ailene.lms.access.AccessRole;
 import com.ailene.lms.auth.AuthService;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
+import com.ailene.lms.notification.NotificationWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ public class CoachingNoteService {
     private final AuthService authService;
     private final AccessRepository accessRepository;
     private final CoachingNoteRepository coachingNoteRepository;
+    private final NotificationWriter notificationWriter;
 
     public List<CoachingNoteItem> list(String jwt, CoachingNotesRequest request) {
         UUID userId = authService.resolveUserId(jwt);
@@ -51,6 +53,9 @@ public class CoachingNoteService {
         note.setText(request.text());
         Integer id = coachingNoteRepository.save(note).getId();
 
-        return CoachingNoteItem.from(coachingNoteRepository.findNoteById(id));
+        CoachingNoteProjection saved = coachingNoteRepository.findNoteById(id);
+        notificationWriter.coachingNoteReceived(studentAccess.getId(), id, saved.getChampionName(),
+                request.text());
+        return CoachingNoteItem.from(saved);
     }
 }

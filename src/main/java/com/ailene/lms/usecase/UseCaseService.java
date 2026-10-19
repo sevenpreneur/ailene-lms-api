@@ -14,6 +14,7 @@ import com.ailene.lms.common.pagination.PagedResponse;
 import com.ailene.lms.common.pagination.Pagination;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
+import com.ailene.lms.notification.NotificationWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class UseCaseService {
     private final UseCaseSubmissionRepository useCaseSubmissionRepository;
     private final AccessRepository accessRepository;
     private final LevelRepository levelRepository;
+    private final NotificationWriter notificationWriter;
 
     public PagedResponse<UseCaseListItem> list(UUID userId, UseCaseListRequest request) {
         int page = Pagination.normalizePage(request.page());
@@ -174,6 +176,8 @@ public class UseCaseService {
         submission.setType(request.type());
         submission.setSubmittedAt(OffsetDateTime.now());
         useCaseSubmissionRepository.save(submission);
+        notificationWriter.useCaseSubmitted(championAccessId, submission.getId(), summary.getAccessId(),
+                request.name());
 
         return getDetails(userId, new UseCaseDetailsRequest(useCaseId));
     }
@@ -239,6 +243,8 @@ public class UseCaseService {
         submission.setType(request.type());
         submission.setSubmittedAt(OffsetDateTime.now());
         useCaseSubmissionRepository.save(submission);
+        notificationWriter.useCaseSubmitted(submission.getAssignedByAccessId(), submission.getId(), access.getId(),
+                useCase.getName());
 
         return getDetails(userId, new UseCaseDetailsRequest(useCase.getId()));
     }

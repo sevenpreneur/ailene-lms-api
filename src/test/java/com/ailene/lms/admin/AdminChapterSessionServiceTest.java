@@ -4,6 +4,7 @@ import com.ailene.lms.chapter.ChapterSession;
 import com.ailene.lms.chapter.ChapterSessionRepository;
 import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
+import com.ailene.lms.notification.NotificationWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +30,8 @@ class AdminChapterSessionServiceTest {
     private AdminGuard adminGuard;
     @Mock
     private ChapterSessionRepository chapterSessionRepository;
+    @Mock
+    private NotificationWriter notificationWriter;
 
     @InjectMocks
     private AdminChapterSessionService adminChapterSessionService;
@@ -60,6 +63,7 @@ class AdminChapterSessionServiceTest {
         assertThat(dto.isLocked()).isTrue();
         assertThat(dto.id()).isEqualTo(12);
         verify(adminGuard).requireAdminOnProject("token", "proj-1");
+        verifyNoInteractions(notificationWriter);
     }
 
     @Test
@@ -73,6 +77,7 @@ class AdminChapterSessionServiceTest {
                 new UpdateChapterSessionLockRequest("proj-1", 12, false));
 
         assertThat(dto.isLocked()).isFalse();
+        verify(notificationWriter).chapterUnlocked(12);
     }
 
     @Test

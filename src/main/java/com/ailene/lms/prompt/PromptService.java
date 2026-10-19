@@ -14,6 +14,7 @@ import com.ailene.lms.common.pagination.PagedResponse;
 import com.ailene.lms.common.pagination.Pagination;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
+import com.ailene.lms.notification.NotificationWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class PromptService {
     private final AccessRepository accessRepository;
     private final LevelRepository levelRepository;
     private final PromptEvaluationService promptEvaluationService;
+    private final NotificationWriter notificationWriter;
 
     public PagedResponse<PromptListItem> list(UUID userId, PromptListRequest request) {
         int page = Pagination.normalizePage(request.page());
@@ -178,6 +180,8 @@ public class PromptService {
         promptEvaluationService.markPending(submission);
         promptSubmissionRepository.save(submission);
         promptEvaluationService.scheduleAfterCommit(submission);
+        notificationWriter.promptSubmitted(championAccessId, submission.getId(), summary.getAccessId(),
+                request.name());
 
         return getDetails(userId, new PromptDetailsRequest(promptId));
     }
@@ -240,6 +244,8 @@ public class PromptService {
         promptEvaluationService.markPending(submission);
         promptSubmissionRepository.save(submission);
         promptEvaluationService.scheduleAfterCommit(submission);
+        notificationWriter.promptSubmitted(submission.getAssignedByAccessId(), submission.getId(), access.getId(),
+                prompt.getName());
 
         return getDetails(userId, new PromptDetailsRequest(prompt.getId()));
     }

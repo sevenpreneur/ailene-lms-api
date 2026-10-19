@@ -3,6 +3,7 @@ package com.ailene.lms.champion;
 import com.ailene.lms.common.CategorySummary;
 import com.ailene.lms.common.exception.BadRequestException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
+import com.ailene.lms.notification.NotificationWriter;
 import com.ailene.lms.prompt.Prompt;
 import com.ailene.lms.prompt.PromptEvaluation;
 import com.ailene.lms.prompt.PromptRepository;
@@ -35,6 +36,7 @@ public class ChampionReviewService {
     private final UseCaseRepository useCaseRepository;
     private final PromptSubmissionRepository promptSubmissionRepository;
     private final UseCaseSubmissionRepository useCaseSubmissionRepository;
+    private final NotificationWriter notificationWriter;
 
     public ReviewQueueResponse getPromptQueue(String jwt, ChampionProjectRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
@@ -126,14 +128,17 @@ public class ChampionReviewService {
         }
         promptSubmissionRepository.save(submission);
 
+        Prompt prompt = promptRepository.findById(submission.getPromptId())
+                .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
+        boolean accepted = Boolean.TRUE.equals(request.isAccepted());
         short xpAwarded = 0;
-        if (Boolean.TRUE.equals(request.isAccepted())) {
-            Prompt prompt = promptRepository.findById(submission.getPromptId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
+        if (accepted) {
             xpAwarded = prompt.getXpReward() == null ? 0 : prompt.getXpReward();
             championRepository.insertXpEarning(submission.getStudentAccessId(), PROMPT_LEARNING_TYPE,
                     String.valueOf(submission.getPromptId()), xpAwarded);
         }
+        notificationWriter.promptReviewed(submission.getStudentAccessId(), prompt.getId(), prompt.getName(),
+                accepted);
 
         return new ReviewResult(xpAwarded);
     }
@@ -154,14 +159,17 @@ public class ChampionReviewService {
         submission.setIsAccepted(request.isAccepted());
         useCaseSubmissionRepository.save(submission);
 
+        UseCase useCase = useCaseRepository.findById(submission.getUseCaseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
+        boolean accepted = Boolean.TRUE.equals(request.isAccepted());
         short xpAwarded = 0;
-        if (Boolean.TRUE.equals(request.isAccepted())) {
-            UseCase useCase = useCaseRepository.findById(submission.getUseCaseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
+        if (accepted) {
             xpAwarded = useCase.getXpReward() == null ? 0 : useCase.getXpReward();
             championRepository.insertXpEarning(submission.getStudentAccessId(), USE_CASE_LEARNING_TYPE,
                     String.valueOf(submission.getUseCaseId()), xpAwarded);
         }
+        notificationWriter.useCaseReviewed(submission.getStudentAccessId(), useCase.getId(), useCase.getName(),
+                accepted);
 
         return new ReviewResult(xpAwarded);
     }

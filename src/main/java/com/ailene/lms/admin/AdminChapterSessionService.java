@@ -3,6 +3,7 @@ package com.ailene.lms.admin;
 import com.ailene.lms.chapter.ChapterSession;
 import com.ailene.lms.chapter.ChapterSessionRepository;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
+import com.ailene.lms.notification.NotificationWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +16,7 @@ public class AdminChapterSessionService {
 
     private final AdminGuard adminGuard;
     private final ChapterSessionRepository chapterSessionRepository;
+    private final NotificationWriter notificationWriter;
 
     public List<AdminChapterSessionDto> listSessions(String token, AdminProjectRequest request) {
         adminGuard.requireAdminOnProject(token, request.projectId());
@@ -32,6 +34,11 @@ public class AdminChapterSessionService {
 
         session.setIsLocked(request.isLocked());
         session.setUpdatedAt(OffsetDateTime.now());
-        return AdminChapterSessionDto.from(chapterSessionRepository.save(session));
+        ChapterSession saved = chapterSessionRepository.save(session);
+        // Deduplicated per session, so locking and reopening never notifies the same member twice.
+        if (!Boolean.TRUE.equals(saved.getIsLocked())) {
+            notificationWriter.chapterUnlocked(saved.getId());
+        }
+        return AdminChapterSessionDto.from(saved);
     }
 }

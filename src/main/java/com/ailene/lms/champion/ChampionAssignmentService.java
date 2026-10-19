@@ -6,6 +6,7 @@ import com.ailene.lms.common.exception.ForbiddenException;
 import com.ailene.lms.common.exception.ResourceNotFoundException;
 import com.ailene.lms.level.Level;
 import com.ailene.lms.level.LevelRepository;
+import com.ailene.lms.notification.NotificationWriter;
 import com.ailene.lms.prompt.Prompt;
 import com.ailene.lms.prompt.PromptRepository;
 import com.ailene.lms.usecase.UseCase;
@@ -30,24 +31,22 @@ public class ChampionAssignmentService {
     private final UseCaseRepository useCaseRepository;
     private final LevelRepository levelRepository;
     private final AssignmentDraftRepository assignmentDraftRepository;
+    private final NotificationWriter notificationWriter;
 
     @Transactional
     public AssignmentResult assignPrompt(String jwt, AssignLibraryRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
         requireFutureDeadline(request.deadline());
 
-        promptRepository.findById(request.libraryId())
-                .filter(prompt -> prompt.getStatus() == Status.active)
+        Prompt prompt = promptRepository.findById(request.libraryId())
+                .filter(p -> p.getStatus() == Status.active)
                 .orElseThrow(() -> new ResourceNotFoundException("Prompt not found"));
 
         List<String> targets = resolveTargets(champion, request.targetType(), request.targetAccessIds(),
                 request.targetGroupIds());
 
-        int assigned = 0;
-        for (String accessId : targets) {
-            assigned += championRepository.insertPromptAssignment(accessId, request.libraryId(),
-                    champion.accessId(), request.deadline(), trimToNull(request.message()));
-        }
+        int assigned = assignPromptTo(targets, prompt.getId(), prompt.getName(), champion, request.deadline(),
+                request.message());
 
         return new AssignmentResult(assigned, targets.size(), targets.size() - assigned);
     }
@@ -57,18 +56,15 @@ public class ChampionAssignmentService {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
         requireFutureDeadline(request.deadline());
 
-        useCaseRepository.findById(request.libraryId())
-                .filter(useCase -> useCase.getStatus() == Status.active)
+        UseCase useCase = useCaseRepository.findById(request.libraryId())
+                .filter(u -> u.getStatus() == Status.active)
                 .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
 
         List<String> targets = resolveTargets(champion, request.targetType(), request.targetAccessIds(),
                 request.targetGroupIds());
 
-        int assigned = 0;
-        for (String accessId : targets) {
-            assigned += championRepository.insertUseCaseAssignment(accessId, request.libraryId(),
-                    champion.accessId(), request.deadline(), trimToNull(request.message()));
-        }
+        int assigned = assignUseCaseTo(targets, useCase.getId(), useCase.getName(), champion, request.deadline(),
+                request.message());
 
         return new AssignmentResult(assigned, targets.size(), targets.size() - assigned);
     }
@@ -107,13 +103,9 @@ public class ChampionAssignmentService {
             promptRepository.insertCategory(promptId, categoryId);
         }
 
-        int assigned = 0;
-        if (request.assignment() != null) {
-            for (String accessId : targets) {
-                assigned += championRepository.insertPromptAssignment(accessId, promptId, champion.accessId(),
-                        request.assignment().deadline(), trimToNull(request.assignment().message()));
-            }
-        }
+        int assigned = request.assignment() == null ? 0
+                : assignPromptTo(targets, promptId, request.name(), champion, request.assignment().deadline(),
+                        request.assignment().message());
 
         return new CreatePromptAssignmentResponse(promptId, assigned, targets.size(), targets.size() - assigned);
     }
@@ -151,15 +143,40 @@ public class ChampionAssignmentService {
             useCaseRepository.insertCategory(useCaseId, categoryId);
         }
 
-        int assigned = 0;
-        if (request.assignment() != null) {
-            for (String accessId : targets) {
-                assigned += championRepository.insertUseCaseAssignment(accessId, useCaseId, champion.accessId(),
-                        request.assignment().deadline(), trimToNull(request.assignment().message()));
-            }
-        }
+        int assigned = request.assignment() == null ? 0
+                : assignUseCaseTo(targets, useCaseId, request.name(), champion, request.assignment().deadline(),
+                        request.assignment().message());
 
         return new CreateUseCaseAssignmentResponse(useCaseId, assigned, targets.size(), targets.size() - assigned);
+    }
+
+    // Only members who did not already hold this item get a row, and only they are notified.
+    private int assignPromptTo(List<String> targets, Integer promptId, String promptName, ChampionContext champion,
+            OffsetDateTime deadline, String message) {
+        int assigned = 0;
+        for (String accessId : targets) {
+            int inserted = championRepository.insertPromptAssignment(accessId, promptId, champion.accessId(),
+                    deadline, trimToNull(message));
+            if (inserted > 0) {
+                notificationWriter.promptAssigned(accessId, promptId, promptName, deadline);
+            }
+            assigned += inserted;
+        }
+        return assigned;
+    }
+
+    private int assignUseCaseTo(List<String> targets, Integer useCaseId, String useCaseName,
+            ChampionContext champion, OffsetDateTime deadline, String message) {
+        int assigned = 0;
+        for (String accessId : targets) {
+            int inserted = championRepository.insertUseCaseAssignment(accessId, useCaseId, champion.accessId(),
+                    deadline, trimToNull(message));
+            if (inserted > 0) {
+                notificationWriter.useCaseAssigned(accessId, useCaseId, useCaseName, deadline);
+            }
+            assigned += inserted;
+        }
+        return assigned;
     }
 
     // A used draft can be turned into another library item; used_* then points at the latest one.

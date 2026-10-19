@@ -91,6 +91,22 @@ CREATE TYPE lms_chapter_test_question_type_enum AS ENUM (
   'essay'
 );
 
+-- Enumeration for the lms_notifications table
+
+CREATE TYPE lms_notification_type_enum AS ENUM (
+  'chapter_reminder',
+  'chapter_unlocked',
+  'prompt_assigned',
+  'use_case_assigned',
+  'prompt_deadline',
+  'use_case_deadline',
+  'prompt_reviewed',
+  'use_case_reviewed',
+  'coaching_note',
+  'prompt_submitted',
+  'use_case_submitted'
+);
+
 ------------
 -- Tables --
 ------------
@@ -657,6 +673,20 @@ CREATE TABLE lms_announcement (
   updated_at  TIMESTAMPTZ  NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE lms_notifications (
+  id          SERIAL                      PRIMARY KEY,
+  access_id   CHAR(21)                    NOT NULL,
+  type        lms_notification_type_enum  NOT NULL,
+  title       VARCHAR                     NOT NULL,
+  body        TEXT                            NULL,
+  ref_id      VARCHAR                         NULL,
+  event_at    TIMESTAMPTZ                     NULL,
+  dedupe_key  VARCHAR                         NULL,
+  read_at     TIMESTAMPTZ                     NULL,
+  created_at  TIMESTAMPTZ                 NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (access_id, dedupe_key)
+);
+
 ----------------
 -- References --
 ----------------
@@ -822,6 +852,9 @@ ALTER TABLE lms_pa_attempt_domain_scores
 ALTER TABLE lms_announcement
   ADD FOREIGN KEY (project_id) REFERENCES lms_projects (id);
 
+ALTER TABLE lms_notifications
+  ADD FOREIGN KEY (access_id) REFERENCES lms_accesses (id) ON DELETE CASCADE;
+
 -------------
 -- Indexes --
 -------------
@@ -889,6 +922,11 @@ CREATE INDEX idx_lms_pa_attempts_config_id           ON lms_pa_attempts (config_
 CREATE INDEX idx_lms_pa_answers_item_id              ON lms_pa_answers (item_id);
 CREATE INDEX idx_lms_pa_answers_option_id            ON lms_pa_answers (option_id);
 CREATE INDEX idx_lms_pa_attempt_domain_scores_domain ON lms_pa_attempt_domain_scores (domain_id);
+
+-- LMS misc
+
+CREATE INDEX idx_lms_notifications_access_created    ON lms_notifications (access_id, created_at DESC, id DESC);
+CREATE INDEX idx_lms_notifications_access_unread     ON lms_notifications (access_id) WHERE read_at IS NULL;
 
 ---------------
 -- Functions --
