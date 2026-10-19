@@ -199,7 +199,7 @@ CREATE TABLE lms_chapter_sessions (
 
 CREATE TABLE lms_materials (
   id           VARCHAR      PRIMARY KEY,
-  chapter_id   INTEGER      NOT NULL,
+  chapter_id   INTEGER      NOT NULL  UNIQUE,
   title        VARCHAR      NOT NULL,
   description  TEXT             NULL,
   content      TEXT             NULL,
@@ -214,7 +214,7 @@ CREATE TABLE lms_materials (
 
 CREATE TABLE lms_videos (
   id           SERIAL       PRIMARY KEY,
-  chapter_id   INTEGER      NOT NULL,
+  chapter_id   INTEGER      NOT NULL  UNIQUE,
   title        VARCHAR      NOT NULL,
   description  TEXT             NULL,
   video_url    TEXT         NOT NULL,
@@ -236,7 +236,7 @@ CREATE TABLE lms_video_timestamps (
 
 CREATE TABLE lms_quizzes (
   id           VARCHAR      PRIMARY KEY,
-  chapter_id   INTEGER      NOT NULL,
+  chapter_id   INTEGER      NOT NULL  UNIQUE,
   name         VARCHAR      NOT NULL,
   description  TEXT             NULL,
   order_index  SMALLINT     NOT NULL  DEFAULT 0,
@@ -840,9 +840,6 @@ CREATE UNIQUE INDEX idx_lms_chapter_sessions_all_groups
 
 -- LMS content
 
-CREATE INDEX idx_lms_materials_chapter_id            ON lms_materials (chapter_id);
-CREATE INDEX idx_lms_videos_chapter_id               ON lms_videos (chapter_id);
-CREATE INDEX idx_lms_quizzes_chapter_id              ON lms_quizzes (chapter_id);
 CREATE INDEX idx_lms_quiz_questions_quiz_id          ON lms_quiz_questions (quiz_id);
 CREATE INDEX idx_lms_quiz_options_question_id        ON lms_quiz_options (question_id);
 CREATE INDEX idx_lms_chapter_test_questions_test_id  ON lms_chapter_test_questions (test_id);
