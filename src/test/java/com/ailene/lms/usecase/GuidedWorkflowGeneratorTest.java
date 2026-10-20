@@ -57,6 +57,18 @@ class GuidedWorkflowGeneratorTest {
     }
 
     @Test
+    void regenerationIncludesPreviousWorkflowAlongsideFeedback() {
+        when(client.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn(workflow());
+        GuidedSession session = new GuidedSession();
+        session.setGenerationsUsed(2);
+        session.setStepsJson(new GuidedJson(mapper).write(generator.parse(workflow(), 1).steps()));
+        generator.generate(session, "Perbaiki langkah kedua.");
+        verify(client).createJsonCompletion(anyString(), argThat(input ->
+                input.contains("previous_workflow") && input.contains("Buat ringkasan")
+                        && input.contains("Perbaiki langkah kedua.")), anyInt(), anyDouble());
+    }
+
+    @Test
     void returnsBadGatewayAfterTwoInvalidResults() {
         when(client.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn("{}");
         assertThatThrownBy(() -> generator.generate(new GuidedSession(), null)).isInstanceOf(BadGatewayException.class);

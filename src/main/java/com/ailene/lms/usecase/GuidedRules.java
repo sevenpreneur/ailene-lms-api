@@ -81,6 +81,7 @@ final class GuidedRules {
         if (clean(r.outcomeProof()) == null || clean(r.description()) == null || clean(r.aiTool()) == null
                 || r.type() == null || r.hoursWithAi() == null || r.hoursWithAi().signum() <= 0
                 || r.hoursWithAi().compareTo(new BigDecimal("9999.99")) > 0
+                || r.hoursWithAi().stripTrailingZeros().scale() > 2
                 || clean(r.testimonial()) == null || r.testimonial().strip().length() < 50
                 || r.helpfulnessRating() == null || r.helpfulnessRating() < 1 || r.helpfulnessRating() > 5
                 || r.shareConsent() == null) {

@@ -47,6 +47,7 @@ public class GuidedWorkflowGenerator {
         input.put("current_process", s.getCurrentProcess());
         input.put("current_tools", json.strings(s.getCurrentToolsJson()));
         input.put("pain_point", s.getPainPoint());
+        input.put("previous_workflow", json.steps(s.getStepsJson()));
         input.put("feedback", feedback);
         String prompt = objectMapper.writeValueAsString(input);
         for (int attempt = 0; attempt < 2; attempt++) {

@@ -73,7 +73,8 @@ public class GuidedUseCaseStore {
                 sessions.saveAndFlush(s);
                 entityManager.refresh(s);
             } else {
-                s = sessions.lockById(s.getId()).orElseThrow(this::notFound);
+                // The lookup may predate a concurrent save; refresh under lock before applying this patch.
+                entityManager.refresh(s, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
             }
         }
         mutable(s);
@@ -207,7 +208,7 @@ public class GuidedUseCaseStore {
 
     @Transactional
     public GuidedSubmitResponse submitExisting(UUID userId, UseCaseSubmitRequest r) {
-        owned(userId, r.guidedSessionId());
+        lockOwned(userId, r.guidedSessionId());
         UseCaseSubmission existing = submissions.findByGuidedSessionId(r.guidedSessionId()).orElse(null);
         GuidedSubmitRequest guided = new GuidedSubmitRequest(r.guidedSessionId(), null, null,
                 r.outcomeProof(), r.hoursWithAi(), r.description(), r.aiTool(), r.type(),
@@ -327,8 +328,7 @@ public class GuidedUseCaseStore {
     }
 
     private GuidedSession lockOwned(UUID userId, Integer id) {
-        owned(userId, id);
-        return sessions.lockById(id).orElseThrow(this::notFound);
+        return sessions.lockOwned(id, userId, AccessRole.student).orElseThrow(this::notFound);
     }
 
     private Access student(UUID userId, String projectId, boolean lock) {

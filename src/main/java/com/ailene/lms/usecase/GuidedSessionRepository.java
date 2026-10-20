@@ -20,6 +20,14 @@ public interface GuidedSessionRepository extends JpaRepository<GuidedSession, In
             """)
     Optional<GuidedSession> findOwned(Integer id, UUID userId, AccessRole role);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select s from GuidedSession s where s.id = :id and exists (
+                select 1 from Access a where a.id = s.studentAccessId and a.userId = :userId and a.role = :role
+            )
+            """)
+    Optional<GuidedSession> lockOwned(Integer id, UUID userId, AccessRole role);
+
     Optional<GuidedSession> findFirstByStudentAccessIdAndUseCaseIdOrderByIdDesc(String accessId, Integer useCaseId);
 
     Optional<GuidedSession> findFirstByStudentAccessIdAndProjectIdAndUseCaseIdIsNullAndStatusNotOrderByIdDesc(

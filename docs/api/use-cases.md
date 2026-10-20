@@ -152,6 +152,16 @@ Retries are idempotent: pending/accepted submissions return the existing result 
 
 Text checks catch recognizable NIK/account/salary patterns and lists of emails/phone numbers. They are an extra guard, not automatic anonymization; the caller must still redact examples and explicitly confirm. Workflow generation does not execute tools, create automations, or publish the student's data.
 
+### Verification
+
+`GuidedRulesTest` and `GuidedWorkflowGeneratorTest` cover validation, savings, schema retries, and regeneration context. `GuidedUseCaseIntegrationTest` uses a real isolated PostgreSQL branch, mocked auth/AI, and transaction rollbacks to cover persistence, authorization, quota/audits, recovery, submission idempotency, Champion details, and revision through the legacy endpoint. Set `DB_URL` to the test branch before running `./mvnw test`; Spring-context tests apply Flyway migrations.
+
+`GuidedUseCaseNativeSmokeTest` is opt-in. Start the native Docker image locally with the same isolated database and runtime secrets (including `DEEPSEEK_API_KEY`), then run `./mvnw test -Dtest=GuidedUseCaseNativeSmokeTest -Dguided.native.base-url=http://127.0.0.1:18080` with that branch's explicit `DB_URL`. It uses real JWTs and one real AI generation with synthetic data, checks concurrent checklist updates and idempotent submission, reads Champion details, then removes its own fixtures. Do not point the test or container at production.
+
+For a provider-only check without a database, run `./mvnw test -Dtest=GuidedWorkflowLiveTest -Dguided.ai.live=true`; it reads the existing `DEEPSEEK_API_KEY` and sends synthetic office-work data. Both live tests are disabled by default.
+
+For local native verification on an 8 GB Docker Desktop VM, the compiler was run from a temporary copy of the Dockerfile using `sh mvnw -B -Pnative -DskipTests "-DbuildArgs=-J-Xmx6g,-J-XX:NewRatio=5,-J-XX:ActiveProcessorCount=4,--parallelism=4" native:compile`. These are build-time resource settings; the application's runtime configuration is unchanged.
+
 ## Library and existing submissions
 
 ### `POST {base_url}/api/v1/use-cases`

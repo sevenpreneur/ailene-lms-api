@@ -170,6 +170,12 @@ class GuidedUseCaseIntegrationTest {
                 .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM lms_guided_use_case_generations WHERE session_id=?", Integer.class, id))
                 .isEqualTo(3);
+        mvc.perform(post("/api/v1/use-cases/guided/save").header("Authorization", "Bearer student")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of(
+                        "session_id", id, "current_step", 2, "daily_task", "Saya menyiapkan pekerjaan lain dengan konteks berbeda."))))
+                .andExpect(status().isConflict());
+        entityManager.clear();
+        assertThat(call("student", "details", Map.of("session_id", id)).get("steps").size()).isEqualTo(3);
     }
 
     @Test
@@ -271,6 +277,44 @@ class GuidedUseCaseIntegrationTest {
                 .isEqualTo("weekly");
         assertThat(jdbc.queryForObject("SELECT helpfulness_rating FROM lms_use_case_submissions WHERE id=?", Integer.class, submissionId))
                 .isEqualTo(4);
+    }
+
+    @Test
+    void librarySessionBindsExistingSubmitToCorrectCaseAndUsesSavedBaseline() throws Exception {
+        int useCaseId = jdbc.queryForObject("""
+                INSERT INTO lms_use_cases(name,description,level_id,only_project_id)
+                SELECT 'Guided library test','Synthetic library work',id,? FROM lms_levels WHERE level_number=3
+                RETURNING id
+                """, Integer.class, project);
+        JsonNode draft = call("student", "save", Map.of("use_case_id", useCaseId, "current_step", 4,
+                "daily_task", "Saya merekap laporan penjualan mingguan dari beberapa cabang.",
+                "frequency", "weekly", "example_text", "Cabang A: target 50 juta, realisasi 45 juta.",
+                "sensitive_data_confirmed", true, "minutes_without_ai", 90,
+                "current_process", "Kumpulkan data, cek angka, lalu tulis ringkasan."));
+        int id = draft.get("id").asInt();
+        JsonNode generated = call("student", "generate", Map.of("session_id", id));
+        call("student", "save", Map.of("session_id", id, "current_step", 5));
+        for (JsonNode step : generated.get("steps")) {
+            call("student", "check", Map.of("session_id", id, "step_id", step.get("id").asInt(), "is_done", true));
+        }
+        Map<String, Object> legacy = new java.util.HashMap<>(outcome(id));
+        legacy.remove("session_id");
+        legacy.put("guided_session_id", id);
+        legacy.put("use_case_id", useCaseId + 1000000);
+        legacy.put("hours_without_ai", 9999);
+        legacy.put("frequency", "daily");
+        mvc.perform(post("/api/v1/use-cases/submit").header("Authorization", "Bearer student")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(legacy)))
+                .andExpect(status().isBadRequest());
+        legacy.put("use_case_id", useCaseId);
+        mvc.perform(post("/api/v1/use-cases/submit").header("Authorization", "Bearer student")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(legacy)))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT hours_without_ai FROM lms_use_case_submissions WHERE guided_session_id=?",
+                java.math.BigDecimal.class, id)).isEqualByComparingTo("1.50");
+        assertThat(jdbc.queryForObject("SELECT frequency::text FROM lms_use_case_submissions WHERE guided_session_id=?",
+                String.class, id)).isEqualTo("weekly");
+        assertThat(call("student", "details", Map.of("session_id", id)).get("use_case_id").asInt()).isEqualTo(useCaseId);
     }
 
     @Test
