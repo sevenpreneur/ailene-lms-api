@@ -13,6 +13,7 @@ import com.ailene.lms.usecase.UseCase;
 import com.ailene.lms.usecase.UseCaseRepository;
 import com.ailene.lms.usecase.UseCaseSubmission;
 import com.ailene.lms.usecase.UseCaseSubmissionRepository;
+import com.ailene.lms.usecase.GuidedUseCaseStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class ChampionReviewService {
     private final PromptSubmissionRepository promptSubmissionRepository;
     private final UseCaseSubmissionRepository useCaseSubmissionRepository;
     private final NotificationWriter notificationWriter;
+    private final GuidedUseCaseStore guidedUseCaseStore;
 
     public ReviewQueueResponse getPromptQueue(String jwt, ChampionProjectRequest request) {
         ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
@@ -83,6 +85,8 @@ public class ChampionReviewService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
 
+        UseCaseSubmission submission = useCaseSubmissionRepository.findById(row.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
         return new UseCaseSubmissionDetail(row.getId(),
                 new UseCaseSubject(row.getItemId(), row.getItemName(), row.getItemText(),
                         new TeamLevelRef(row.getLevelId(), row.getLevelNumber(), row.getLevelName())),
@@ -93,7 +97,10 @@ public class ChampionReviewService {
                 row.getDeadline(), row.getMessage(), row.getOutcomeProof(), row.getHoursWithAi(),
                 row.getHoursWithoutAi(), row.getDescription(), row.getAiTool(), row.getFrequency(), row.getType(),
                 row.getSubmittedAt(), row.getReviewedAt(), row.getComment(), Boolean.TRUE.equals(row.getAccepted()),
-                categoriesFor(championRepository.findUseCaseCategories(List.of(row.getItemId())), row.getItemId()));
+                categoriesFor(championRepository.findUseCaseCategories(List.of(row.getItemId())), row.getItemId()),
+                submission.getGuidedSessionId() == null ? null : guidedUseCaseStore.forReview(submission.getGuidedSessionId()),
+                submission.getTestimonial(), submission.getHelpfulnessRating(), submission.getShareConsent(),
+                submission.getHoursSaved());
     }
 
     @Transactional

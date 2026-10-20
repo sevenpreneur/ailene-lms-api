@@ -10,6 +10,7 @@ public enum StatusName {
     NOT_FOUND,
     METHOD_NOT_ALLOWED,
     CONFLICT,
+    TOO_MANY_REQUESTS,
     INTERNAL_SERVER_ERROR,
     BAD_GATEWAY,
     SERVICE_UNAVAILABLE;
@@ -25,6 +26,7 @@ public enum StatusName {
             case 404 -> NOT_FOUND;
             case 405 -> METHOD_NOT_ALLOWED;
             case 409 -> CONFLICT;
+            case 429 -> TOO_MANY_REQUESTS;
             case 500 -> INTERNAL_SERVER_ERROR;
             case 502 -> BAD_GATEWAY;
             case 503 -> SERVICE_UNAVAILABLE;

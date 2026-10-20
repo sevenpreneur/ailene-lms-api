@@ -1,8 +1,158 @@
 # Use Cases
 
-Endpoint for browsing a project's use case library (curated use cases only — `is_self_created = false`), with search, pagination, and the caller's own submission status per use case. Mirrors `docs/api/prompts.md` exactly, just backed by `lms_use_cases`/`lms_use_case_submissions`.
+Endpoints for the project's curated library, assignments, submissions, and guided adoption. The guided flow starts from a student's own work without requiring a library item, persists each modal step, and creates an L3 self-created use case only when submitted. Existing library endpoints remain available.
 
 ## Endpoints
+
+## Guided adoption
+
+All endpoints below are **POST**, use `Authorization: Bearer <active LMS JWT>`, and require the caller's student access. Sessions are private to their owner; another student's session returns 404. Responses use the usual `success`, `code`, `status`, `message`, `data` envelope. The six modal steps are intake, example, current process, workflow preview, execution, and outcome.
+
+### `POST {base_url}/api/v1/use-cases/guided/details`
+
+Resume by `{ "session_id": 1 }`, or look up the latest open personal draft with `{ "project_id": "<project-id>" }`. A lookup with no draft returns `data: null`. To resume a library item, send `use_case_id` and optionally `project_id`; a shared library item requires an explicit project. Completed personal submissions can still be retrieved by session id, while project-only lookup starts a new draft after submission.
+
+The session shape returned by `details`, `save`, and `generate` is:
+
+```json
+{
+  "id": 1,
+  "use_case_id": null,
+  "project_id": "<project-id>",
+  "status": "steps_ready",
+  "current_step": 4,
+  "daily_task": "Saya merekap laporan penjualan mingguan dari beberapa cabang.",
+  "frequency": "weekly",
+  "example_text": "Cabang A: target 50 juta, realisasi 45 juta.",
+  "example_file_url": null,
+  "sensitive_data_confirmed": true,
+  "minutes_without_ai": 90.00,
+  "current_process": "Kumpulkan data, cek angka, lalu tulis ringkasan.",
+  "current_tools": ["Excel"],
+  "pain_point": "Menyusun ringkasan memakan waktu.",
+  "steps": [
+    {
+      "id": 11,
+      "order": 1,
+      "title": "Siapkan data",
+      "instruction": "Samarkan identitas pada data sumber.",
+      "suggested_tool": "Excel",
+      "prompt_template": "",
+      "estimated_minutes": 10,
+      "verification": "Tidak ada identitas pribadi.",
+      "is_done": false,
+      "skipped_reason": null,
+      "note": null,
+      "done_at": null
+    }
+  ],
+  "summary": "Rekap laporan dengan pemeriksaan angka.",
+  "estimated_minutes_with_ai": 35,
+  "risks": ["Cocokkan angka dengan sumber."],
+  "regenerate_remaining": 2,
+  "is_generating": false,
+  "created_at": "2026-10-20T10:00:00Z",
+  "updated_at": "2026-10-20T10:01:00Z"
+}
+```
+
+The example truncates `steps`; a generated workflow contains 3–7 steps. Statuses are `intake`, `steps_ready`, `in_progress`, `ready_to_submit`, and `submitted`. `is_generating` is true only while a generation lease is active (five minutes). `regenerate_remaining` counts all available generations, including the first, from a total allowance of three.
+
+### `POST {base_url}/api/v1/use-cases/guided/save`
+
+Upserts a draft and persists navigation. For a new personal draft, provide `project_id` without `use_case_id`. Subsequent calls should send `session_id`. Without it, the open draft for that student/project (or selected library item) is reused; concurrent creates are serialized. No AI call occurs.
+
+```json
+{
+  "project_id": "<project-id>",
+  "current_step": 4,
+  "daily_task": "Saya merekap laporan penjualan mingguan dari beberapa cabang.",
+  "frequency": "weekly",
+  "example_text": "Cabang A: target 50 juta, realisasi 45 juta.",
+  "sensitive_data_confirmed": true,
+  "minutes_without_ai": 90,
+  "current_process": "Kumpulkan data, cek angka, lalu tulis ringkasan.",
+  "current_tools": ["Excel"],
+  "pain_point": "Menyusun ringkasan memakan waktu."
+}
+```
+
+`current_step` is always required (1–6). Other fields are partial updates: omitted or `null` leaves a value unchanged; an empty string clears optional text/file fields, and `[]` clears tools. Limits: `daily_task` 3000 characters, `example_text` 10000, file URL 500, `current_process` 5000, `pain_point` 2000, and up to 20 nonblank tools of 100 characters each. Minutes must be positive, at most 599999.40, with at most two decimals. Frequency uses the existing `daily`, `weekly`, `monthly` enum.
+
+Navigation validates all preceding steps: step 2 needs a task of at least 30 trimmed characters and frequency; step 3 needs an example plus sensitive-data confirmation; step 4 needs baseline minutes and current process; step 5 needs a generated workflow; step 6 needs every step completed or explicitly skipped. Saving step 5 accepts the preview and enables the checklist.
+
+Changing intake invalidates the generated workflow and checklist, retaining generation audit history and quota. Changing either example field resets confirmation unless `sensitive_data_confirmed: true` is sent in that request. When the generation allowance is exhausted, edits that would invalidate the existing workflow return 409, preserving the usable workflow. Submitted intake is immutable.
+
+**Files:** `example_file_url` accepts HTTPS URLs whose paths end in PDF, DOCX, XLSX, CSV, PNG, JPG, or JPEG (query parameters are allowed). Upload uses the existing client/storage flow. This API never downloads the URL or extracts its contents. Before generation, also supply anonymized contents or a summary in `example_text`; a file-only example can be saved but cannot generate a workflow.
+
+### `POST {base_url}/api/v1/use-cases/guided/generate`
+
+Request: `{ "session_id": 1, "feedback": "Gunakan Copilot untuk langkah ringkasan." }`. Feedback is optional, max 2000 characters. Returns the updated session with a 3–7 step workflow in Indonesian, reusable prompts, verification checks, risks, and estimated duration. It returns to preview (step 4); accept with `save` step 5 before execution. Regeneration replaces the checklist and step ids, so clients must replace their cached steps.
+
+The backend reuses DeepSeek's configured client. It reserves an attempt under a row lock, calls AI outside the database transaction, validates JSON/schema, retries malformed output once, and saves the workflow and audit record atomically. There are three successful generations per session. Provider or validation failures release the attempt and preserve the previous workflow. A process interruption leaves a five-minute lease; after expiry another request can retry, with that interrupted attempt still counted. Mutations during an active generation return 409. Do not automatically retry generation on a request timeout: first resume the session.
+
+### `POST {base_url}/api/v1/use-cases/guided/check`
+
+```json
+{ "session_id": 1, "step_id": 11, "is_done": true, "note": "Angka sudah cocok." }
+```
+
+Returns the updated step only. `note` and `skipped_reason` are optional, max 2000 characters. To skip, send `is_done: false` with a nonblank `skipped_reason`. To undo a skip, send `is_done: false, skipped_reason: ""`. Completing a step clears its skip reason and assigns the server's `done_at`; unchecking clears that timestamp. Session status becomes `ready_to_submit` once every step is done/skipped. Read `details` to refresh the full session. Unknown or superseded step ids return 404.
+
+### `POST {base_url}/api/v1/use-cases/guided/submit`
+
+```json
+{
+  "session_id": 1,
+  "name": "Rekap laporan mingguan",
+  "category_ids": [87],
+  "outcome_proof": "https://example.test/hasil.pdf",
+  "hours_with_ai": 0.5,
+  "description": "Ringkasan sudah dicocokkan dengan sumber.",
+  "ai_tool": "ChatGPT",
+  "type": "data_analysis",
+  "testimonial": "AI membantu menyusun laporan lebih rapi. Saya tetap memeriksa semua angka sebelum membagikannya.",
+  "helpfulness_rating": 4,
+  "share_consent": false
+}
+```
+
+Only `name` (max 255, defaults to task text) and `category_ids` (0–2 existing ids) are optional. Proof must be a valid HTTP/HTTPS link, max 500 characters. Actual hours must be positive, at most 9999.99, and have at most two decimals. Description is nonblank, max 5000; tool is nonblank, max 255; testimonial is 50–5000 trimmed characters; rating is 1–5; explicit boolean consent is required, with `false` valid. `type` uses the existing use-case enum below. Baseline hours and frequency are derived from the saved intake; clients cannot override them here.
+
+Returns `data`:
+
+```json
+{
+  "session": { "id": 1, "status": "submitted", "current_step": 6 },
+  "submission_id": 12,
+  "use_case_id": 7,
+  "submission_status": "awaiting_review",
+  "hours_saved": 1.00
+}
+```
+
+`session` contains the full session shape (abbreviated above). New personal work creates an L3 self-created use case and routes its submission to the student's group champion in one transaction. Existing library work reuses its assignment. Missing group/champion prevents submission without partial writes. Savings are `max(0, minutes_without_ai / 60 - hours_with_ai)`, rounded to two decimals by the backend. Estimates generated by AI are never used as actual duration.
+
+Retries are idempotent: pending/accepted submissions return the existing result without new rows or notifications. If a champion requests revision, the student can resubmit outcome fields on the same session/submission; intake and workflow remain fixed. `submission_status` is `awaiting_review`, `needs_revision`, or `accepted`. Champion details include the full guided session, testimonial, rating, consent, and savings; review and XP use existing endpoints/rules. Consent is stored for future sharing and does not publish anything.
+
+**Existing submit compatibility:** `/api/v1/use-cases/submit` accepts optional `guided_session_id`, `testimonial`, `helpfulness_rating`, and `share_consent`. A matching completed session is mandatory when that id is supplied. For an already linked submission the guided path is enforced automatically, including on revision; omitted testimonial/rating/consent preserve saved values. Existing required legacy fields still apply, but guided frequency/baseline are taken from intake. The legacy response shape is unchanged. Ordinary submissions without a guided session retain existing behavior.
+
+### Guided errors
+
+| HTTP | Meaning |
+|---|---|
+| 400 | Invalid input, incomplete prior steps, missing anonymized text for generation, invalid URL, or sensitive-data pattern detected |
+| 401 | Missing, expired, inactive, or invalid JWT |
+| 403 | Project access is not a student |
+| 404 | Session/access/use case not found, another student's session, or stale workflow step |
+| 409 | Generation in progress, submitted intake edit, exhausted-quota intake edit, or conflicting session/submission |
+| 429 | Three workflow generations already used (`TOO_MANY_REQUESTS`) |
+| 502 | AI provider failed or returned unusable output after validation/retry |
+| 503 | `DEEPSEEK_API_KEY` unavailable |
+
+Text checks catch recognizable NIK/account/salary patterns and lists of emails/phone numbers. They are an extra guard, not automatic anonymization; the caller must still redact examples and explicitly confirm. Workflow generation does not execute tools, create automations, or publish the student's data.
+
+## Library and existing submissions
 
 ### `POST {base_url}/api/v1/use-cases`
 

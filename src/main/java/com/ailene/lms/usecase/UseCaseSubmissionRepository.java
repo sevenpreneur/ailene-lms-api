@@ -7,4 +7,6 @@ import java.util.Optional;
 public interface UseCaseSubmissionRepository extends JpaRepository<UseCaseSubmission, Integer> {
 
     Optional<UseCaseSubmission> findByStudentAccessIdAndUseCaseId(String studentAccessId, Integer useCaseId);
+
+    Optional<UseCaseSubmission> findByGuidedSessionId(Integer guidedSessionId);
 }

@@ -52,6 +52,21 @@ public class UseCaseSubmission {
     @Column(name = "hours_without_ai", precision = 6, scale = 2)
     private BigDecimal hoursWithoutAi;
 
+    @Column(name = "guided_session_id")
+    private Integer guidedSessionId;
+
+    @Column
+    private String testimonial;
+
+    @Column(name = "helpfulness_rating")
+    private Integer helpfulnessRating;
+
+    @Column(name = "share_consent")
+    private Boolean shareConsent;
+
+    @Column(name = "hours_saved", precision = 6, scale = 2)
+    private BigDecimal hoursSaved;
+
     @Column
     private String description;
 

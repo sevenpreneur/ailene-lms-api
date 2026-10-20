@@ -49,6 +49,11 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooManyRequests(TooManyRequestsException ex) {
+        return ApiResponse.error(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    }
+
     @ExceptionHandler(BadGatewayException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadGateway(BadGatewayException ex) {
         return ApiResponse.error(HttpStatus.BAD_GATEWAY, ex.getMessage());

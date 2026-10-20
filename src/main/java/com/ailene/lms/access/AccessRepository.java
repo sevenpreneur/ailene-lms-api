@@ -11,6 +11,10 @@ import java.util.UUID;
 
 public interface AccessRepository extends JpaRepository<Access, String> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Access a where a.userId = :userId and a.projectId = :projectId")
+    Optional<Access> lockByUserIdAndProjectId(UUID userId, String projectId);
+
     Optional<Access> findByUserIdAndProjectId(UUID userId, String projectId);
 
     @Query(value = """

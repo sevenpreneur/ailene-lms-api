@@ -37,6 +37,7 @@ public class UseCaseService {
     private final AccessRepository accessRepository;
     private final LevelRepository levelRepository;
     private final NotificationWriter notificationWriter;
+    private final GuidedUseCaseStore guidedUseCaseStore;
 
     public PagedResponse<UseCaseListItem> list(UUID userId, UseCaseListRequest request) {
         int page = Pagination.normalizePage(request.page());
@@ -219,6 +220,10 @@ public class UseCaseService {
 
     @Transactional
     public UseCaseDetailsResponse submit(UUID userId, UseCaseSubmitRequest request) {
+        if (request.guidedSessionId() != null) {
+            guidedUseCaseStore.submitExisting(userId, request);
+            return getDetails(userId, new UseCaseDetailsRequest(request.useCaseId()));
+        }
         UseCase useCase = useCaseRepository.findById(request.useCaseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Use case not found"));
         Level level = levelRepository.findById(useCase.getLevelId())
@@ -232,6 +237,14 @@ public class UseCaseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
         if (Boolean.TRUE.equals(submission.getIsAccepted())) {
             throw new BadRequestException("Assignment already accepted, cannot resubmit.");
+        }
+
+        if (submission.getGuidedSessionId() != null) {
+            guidedUseCaseStore.submitExisting(userId, new UseCaseSubmitRequest(request.useCaseId(),
+                    request.outcomeProof(), request.hoursWithAi(), request.hoursWithoutAi(), request.description(),
+                    request.aiTool(), request.frequency(), request.type(), submission.getGuidedSessionId(),
+                    request.testimonial(), request.helpfulnessRating(), request.shareConsent()));
+            return getDetails(userId, new UseCaseDetailsRequest(request.useCaseId()));
         }
 
         submission.setOutcomeProof(request.outcomeProof());

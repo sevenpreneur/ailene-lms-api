@@ -811,7 +811,7 @@ One use case submission in full.
 }
 ```
 
-`frequency` and `type` come back as the raw Postgres enum labels (`monthly`, `workflow_automation`). Hours saved isn't precomputed here — it's `hours_without_ai - hours_with_ai`, and the aggregate endpoints only count it when both are present and the difference is positive.
+`frequency` and `type` come back as the raw Postgres enum labels (`monthly`, `workflow_automation`). Guided submissions additionally return `guided_session` (the full persisted intake and workflow/checklist; see `use-cases.md`), `testimonial`, `helpfulness_rating` (1–5), `share_consent`, and `hours_saved`. These fields are `null` on legacy submissions. `hours_saved` is computed server-side from the intake's baseline minutes minus actual hours, clamped to zero and rounded to two decimals. Aggregate endpoints retain their existing positive-difference calculation. Only champions of the student's group can read these details; `share_consent: false` does not prevent the assigned review, and must not be treated as permission to publish the testimonial elsewhere.
 
 **Errors** — same as `prompts/submission-details`.
 
