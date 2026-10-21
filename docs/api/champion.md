@@ -767,6 +767,63 @@ Assigns an existing library use case to team members. Same request, response and
 
 Creates a new library use case and optionally assigns it. Same as `prompts/create-assignment` minus `expected_output`. The response carries `use_case_id` instead of `prompt_id`, and the level error reads `Use case level (L3) not found`. `draft_id` works the same way, except that it stamps `used_use_case_id` and requires a `USE_CASE` draft (`Draft is not a use case draft` otherwise).
 
+### `POST {base_url}/api/v1/champion/use-cases/create-guided`
+
+Creates a new library use case, assigns it, and opens a guided session for every target with steps 1–3 (task, example, current process) already filled in by the champion. Each student lands on step 4 of `use-cases/guided/*`, generates their own workflow, runs it and submits, exactly like a self-started guided session.
+
+**Authorization:** `Bearer <jwt>`.
+
+**Request**
+
+```json
+{
+  "project_id": "V7rdgcYkq9PHQZkwvoA-F",
+  "name": "Rekap laporan penjualan mingguan",
+  "description": null,
+  "category_ids": [87],
+  "assignment": {
+    "target_type": "MEMBER",
+    "target_access_ids": ["Qm2...", "Lp9..."],
+    "deadline": "2026-11-15T16:59:59Z",
+    "message": "Coba pakai data minggu lalu."
+  },
+  "intake": {
+    "daily_task": "Saya merekap laporan penjualan mingguan dari beberapa cabang, lalu menulis ringkasan.",
+    "frequency": "weekly",
+    "example_text": "Cabang A: target 50, realisasi 45. Cabang B: target 40, realisasi 44.",
+    "example_file_url": null,
+    "sensitive_data_confirmed": true,
+    "minutes_without_ai": 90,
+    "current_process": "1. Kumpulkan laporan\n2. Cek total di Excel\n3. Tulis ringkasan",
+    "current_tools": ["Excel", "Email"],
+    "pain_point": "Menyatukan format laporan."
+  }
+}
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `project_id` | string | yes |
+| `name` | string, max 255 | yes |
+| `description` | string, max 5000 | no — defaults to `intake.daily_task` |
+| `category_ids` | short[], 1–2 entries | yes |
+| `assignment` | object (same target/deadline/message fields as `assign`) | yes |
+| `intake.daily_task` | string, 30–3000 | yes |
+| `intake.frequency` | `daily` / `weekly` / `monthly` / `occasionally` | yes |
+| `intake.example_text` | string, max 10000 | yes |
+| `intake.example_file_url` | HTTPS file URL, max 500 | no |
+| `intake.sensitive_data_confirmed` | boolean, must be `true` | yes |
+| `intake.minutes_without_ai` | number > 0, ≤ 599999.40, two decimals | yes |
+| `intake.current_process` | string, max 5000 | yes |
+| `intake.current_tools` | string[], max 20 × 100 | no |
+| `intake.pain_point` | string, max 2000 | no |
+
+The intake goes through the same rules as `use-cases/guided/save` (including the sensitive-data pattern check) before anything is written, so a rejected request leaves no use case behind. The use case is created at **level 3** with `is_self_created = false`. Each student gets one session (`use_case_id` set, `status: "intake"`, `current_step: 4`, full generation allowance) and the usual assignment notification; they can still edit steps 1–3 before generating. Read the session with `use-cases/guided/details` and `{ "use_case_id": <id> }`. The response is the same as `use-cases/create-assignment`.
+
+**Errors**
+
+Same cases as `use-cases/create-assignment`, plus `400` with the guided validation message (for example `Data sensitif terdeteksi. ...`) when the intake fails, and `400` field errors such as `intake.sensitiveDataConfirmed: must be true`.
+
 ### `POST {base_url}/api/v1/champion/use-cases/submissions`
 
 The use case review queue. Same shape as `prompts/submissions`, but `subject.text` is the use case description and `hours_with_ai` / `ai_tool` carry real values once a student has submitted.

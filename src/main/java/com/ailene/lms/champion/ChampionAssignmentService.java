@@ -9,6 +9,7 @@ import com.ailene.lms.level.LevelRepository;
 import com.ailene.lms.notification.NotificationWriter;
 import com.ailene.lms.prompt.Prompt;
 import com.ailene.lms.prompt.PromptRepository;
+import com.ailene.lms.usecase.GuidedUseCaseStore;
 import com.ailene.lms.usecase.UseCase;
 import com.ailene.lms.usecase.UseCaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class ChampionAssignmentService {
     private final LevelRepository levelRepository;
     private final AssignmentDraftRepository assignmentDraftRepository;
     private final NotificationWriter notificationWriter;
+    private final GuidedUseCaseStore guidedUseCaseStore;
 
     @Transactional
     public AssignmentResult assignPrompt(String jwt, AssignLibraryRequest request) {
@@ -146,6 +148,44 @@ public class ChampionAssignmentService {
         int assigned = request.assignment() == null ? 0
                 : assignUseCaseTo(targets, useCaseId, request.name(), champion, request.assignment().deadline(),
                         request.assignment().message());
+
+        return new CreateUseCaseAssignmentResponse(useCaseId, assigned, targets.size(), targets.size() - assigned);
+    }
+
+    @Transactional
+    public CreateUseCaseAssignmentResponse createGuidedUseCase(String jwt, CreateGuidedUseCaseRequest request) {
+        ChampionContext champion = championAccessGuard.requireChampion(jwt, request.projectId());
+        guidedUseCaseStore.requirePrefill(request.intake());
+
+        List<Short> categoryIds = request.categoryIds().stream().distinct().toList();
+        if (useCaseRepository.countExistingCategories(categoryIds) != categoryIds.size()) {
+            throw new ResourceNotFoundException("Some categories were not found");
+        }
+
+        Level level = levelRepository.findByLevelNumber(USE_CASE_LEVEL_NUMBER)
+                .orElseThrow(() -> new ResourceNotFoundException("Use case level (L3) not found"));
+
+        List<String> targets = resolveAssignmentSpec(champion, request.assignment());
+
+        String description = trimToNull(request.description());
+        UseCase useCase = new UseCase();
+        useCase.setLevelId(level.getId());
+        useCase.setOnlyProjectId(request.projectId());
+        useCase.setName(request.name().strip());
+        useCase.setDescription(description == null ? request.intake().dailyTask().strip() : description);
+        useCase.setStatus(Status.active);
+        useCase.setIsSelfCreated(false);
+        Integer useCaseId = useCaseRepository.save(useCase).getId();
+
+        for (Short categoryId : categoryIds) {
+            useCaseRepository.insertCategory(useCaseId, categoryId);
+        }
+
+        int assigned = assignUseCaseTo(targets, useCaseId, useCase.getName(), champion,
+                request.assignment().deadline(), request.assignment().message());
+        for (String accessId : targets) {
+            guidedUseCaseStore.prefill(accessId, request.projectId(), useCaseId, request.intake());
+        }
 
         return new CreateUseCaseAssignmentResponse(useCaseId, assigned, targets.size(), targets.size() - assigned);
     }

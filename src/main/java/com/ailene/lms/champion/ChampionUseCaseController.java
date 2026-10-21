@@ -40,6 +40,15 @@ public class ChampionUseCaseController {
                 championAssignmentService.createUseCaseAssignment(jwt, request));
     }
 
+    @PostMapping("/create-guided")
+    public ResponseEntity<ApiResponse<CreateUseCaseAssignmentResponse>> createGuided(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @Valid @RequestBody CreateGuidedUseCaseRequest request) {
+        String jwt = secretKeyGuard.extractBearerToken(authorization);
+        return ApiResponse.success(HttpStatus.OK, "guided use case created successfully",
+                championAssignmentService.createGuidedUseCase(jwt, request));
+    }
+
     @PostMapping("/submissions")
     public ResponseEntity<ApiResponse<ReviewQueueResponse>> submissions(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
