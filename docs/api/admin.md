@@ -1,6 +1,6 @@
 # Admin
 
-Curriculum/session CRUD and the five learning-content editors are documented in [Admin curriculum](admin-curriculum.md).
+Curriculum/session CRUD and the five learning-content editors are documented in [Admin curriculum](admin-curriculum.md); the read-only monitoring endpoints in [Admin insights](admin-insights.md).
 
 Endpoints for Ailene administrators to manage a project's groups and who can access it. `/api/v1/admin/projects` lists the projects to pick from, `/api/v1/admin/groups/*` creates, renames and deletes a project's groups (`lms_groups`), `/api/v1/admin/chapter-sessions/*` lists a project's chapter sessions and locks or unlocks one, and `/api/v1/admin/users/*` invites people into a project and group, changes their role, group or profile, and removes them (`lms_accesses`, plus `lms_users` for the person).
 
