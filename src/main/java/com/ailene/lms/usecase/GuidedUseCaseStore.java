@@ -120,6 +120,43 @@ public class GuidedUseCaseStore {
         return view(s);
     }
 
+    // Runs before anything is written, so a rejected champion prefill leaves no use case behind.
+    public void requirePrefill(GuidedPrefill p) {
+        GuidedSession s = new GuidedSession();
+        applyPrefill(s, p);
+        GuidedRules.requireThrough(s, List.of(), 4);
+    }
+
+    // A champion-prefilled session opens on the workflow step; the student still generates, runs and submits it.
+    @Transactional
+    public void prefill(String studentAccessId, String projectId, Integer useCaseId, GuidedPrefill p) {
+        GuidedSession s = new GuidedSession();
+        s.setStudentAccessId(studentAccessId);
+        s.setProjectId(projectId);
+        s.setUseCaseId(useCaseId);
+        applyPrefill(s, p);
+        GuidedRules.requireThrough(s, List.of(), 4);
+        s.setCurrentStep(4);
+        sessions.save(s);
+    }
+
+    private void applyPrefill(GuidedSession s, GuidedPrefill p) {
+        s.setDailyTask(GuidedRules.clean(p.dailyTask()));
+        s.setFrequency(p.frequency());
+        s.setExampleText(GuidedRules.clean(p.exampleText()));
+        String url = GuidedRules.clean(p.exampleFileUrl());
+        if (url != null) GuidedRules.requireLink(url, true);
+        s.setExampleFileUrl(url);
+        s.setSensitiveDataConfirmed(Boolean.TRUE.equals(p.sensitiveDataConfirmed()));
+        s.setMinutesWithoutAi(p.minutesWithoutAi());
+        s.setCurrentProcess(GuidedRules.clean(p.currentProcess()));
+        List<String> tools = p.currentTools() == null ? List.of() : p.currentTools().stream().map(String::strip).distinct().toList();
+        s.setCurrentToolsJson(json.write(tools));
+        s.setPainPoint(GuidedRules.clean(p.painPoint()));
+        GuidedRules.requireSafe(s.getDailyTask(), s.getExampleText(), s.getCurrentProcess(), s.getPainPoint(),
+                String.join(", ", tools));
+    }
+
     @Transactional
     public GenerationReservation reserve(UUID userId, GuidedGenerateRequest r) {
         GuidedSession s = lockOwned(userId, r.sessionId());
