@@ -9,6 +9,9 @@ import java.util.Optional;
 
 public interface ChapterSessionRepository extends JpaRepository<ChapterSession, Integer> {
 
+    @Query(value = "SELECT id FROM lms_chapters WHERE id = :chapterId FOR KEY SHARE", nativeQuery = true)
+    Integer lockChapterForContentWrite(@Param("chapterId") Integer chapterId);
+
     List<ChapterSession> findByChapterId(Integer chapterId);
 
     List<ChapterSession> findByProjectIdOrderBySessionDateAscIdAsc(String projectId);

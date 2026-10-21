@@ -1,5 +1,7 @@
 # Admin
 
+Curriculum/session CRUD and the five learning-content editors are documented in [Admin curriculum](admin-curriculum.md).
+
 Endpoints for Ailene administrators to manage a project's groups and who can access it. `/api/v1/admin/projects` lists the projects to pick from, `/api/v1/admin/groups/*` creates, renames and deletes a project's groups (`lms_groups`), `/api/v1/admin/chapter-sessions/*` lists a project's chapter sessions and locks or unlocks one, and `/api/v1/admin/users/*` invites people into a project and group, changes their role, group or profile, and removes them (`lms_accesses`, plus `lms_users` for the person).
 
 **Authorization:** these endpoints do **not** take the LMS session from `auth/login/google`. They take the identity service's own session token, sent as `Authorization: Bearer <token>`, which is the value stored in its `tokens` table. The token has to match an active `tokens` row exactly (`is_active = true`), its `exp` claim must be in the future, and the `users` row it belongs to must have `role = 'administrator'`, `status = 'active'` and no `deleted_at`. The LMS doesn't hold the identity service's signing key, so it can't verify the signature itself. The exact match against a row the identity service wrote is the proof, and logging out there (deactivating or deleting the row) ends access here straight away. An administrator needs no `lms_users` row and no access to the project they manage.

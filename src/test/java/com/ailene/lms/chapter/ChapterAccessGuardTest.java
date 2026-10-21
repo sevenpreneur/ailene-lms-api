@@ -15,6 +15,8 @@ import static com.ailene.lms.chapter.ChapterScheduleTest.session;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class ChapterAccessGuardTest {
@@ -30,6 +32,18 @@ class ChapterAccessGuardTest {
 
     private void givenSessions(ChapterSession... sessions) {
         when(chapterSessionRepository.findApplicableSessions(5, "access-1")).thenReturn(List.of(sessions));
+    }
+
+    @Test
+    void learnerWriteHoldsChapterStableWhileScoringAndSaving() {
+        givenSessions(session(1, null, PAST, false));
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            chapterAccessGuard.requireUnlocked(5, "access-1");
+            verify(chapterSessionRepository).lockChapterForContentWrite(5);
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
     }
 
     @Test

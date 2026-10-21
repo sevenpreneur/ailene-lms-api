@@ -3,6 +3,7 @@ package com.ailene.lms.chapter;
 import com.ailene.lms.common.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
 
@@ -20,6 +21,11 @@ public class ChapterAccessGuard {
     }
 
     public ChapterSession requireUnlocked(Integer chapterId, String accessId) {
+        // Keep an admin's curriculum replacement from racing a learner's scoring/submission transaction.
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && !TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+            chapterSessionRepository.lockChapterForContentWrite(chapterId);
+        }
         ChapterSession session = findSession(chapterId, accessId)
                 .orElseThrow(() -> new ForbiddenException(NOT_SCHEDULED));
         ChapterLockedReason reason = ChapterSchedule.lockedReason(session);
