@@ -25,6 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GuidedUseCaseStore {
     public static final int MAX_GENERATIONS = 3;
+    private static final List<AccessRole> LEARNER_ROLES = List.of(AccessRole.student, AccessRole.champion);
     private final GuidedSessionRepository sessions;
     private final GuidedGenerationRepository generations;
     private final UseCaseRepository useCases;
@@ -39,7 +40,7 @@ public class GuidedUseCaseStore {
     public GuidedSessionResponse details(UUID userId, GuidedDetailsRequest request) {
         if (request.sessionId() != null) return view(owned(userId, request.sessionId()));
         String projectId = project(request.projectId(), request.useCaseId());
-        Access access = student(userId, projectId, false);
+        Access access = learner(userId, projectId, false);
         GuidedSession session = request.useCaseId() == null
                 ? sessions.findFirstByStudentAccessIdAndProjectIdAndUseCaseIdIsNullAndStatusNotOrderByIdDesc(
                         access.getId(), projectId, GuidedStatus.submitted).orElse(null)
@@ -59,7 +60,7 @@ public class GuidedUseCaseStore {
             }
         } else {
             String projectId = project(r.projectId(), r.useCaseId());
-            Access access = student(userId, projectId, true);
+            Access access = learner(userId, projectId, true);
             s = r.useCaseId() == null
                     ? sessions.findFirstByStudentAccessIdAndProjectIdAndUseCaseIdIsNullAndStatusNotOrderByIdDesc(
                             access.getId(), projectId, GuidedStatus.submitted).orElse(null)
@@ -361,17 +362,19 @@ public class GuidedUseCaseStore {
     }
 
     private GuidedSession owned(UUID userId, Integer id) {
-        return sessions.findOwned(id, userId, AccessRole.student).orElseThrow(this::notFound);
+        return sessions.findOwned(id, userId, LEARNER_ROLES).orElseThrow(this::notFound);
     }
 
     private GuidedSession lockOwned(UUID userId, Integer id) {
-        return sessions.lockOwned(id, userId, AccessRole.student).orElseThrow(this::notFound);
+        return sessions.lockOwned(id, userId, LEARNER_ROLES).orElseThrow(this::notFound);
     }
 
-    private Access student(UUID userId, String projectId, boolean lock) {
+    private Access learner(UUID userId, String projectId, boolean lock) {
         Access access = (lock ? accesses.lockByUserIdAndProjectId(userId, projectId)
                 : accesses.findByUserIdAndProjectId(userId, projectId)).orElseThrow(this::notFound);
-        if (access.getRole() != AccessRole.student) throw new ForbiddenException("Fitur ini hanya untuk student.");
+        if (!LEARNER_ROLES.contains(access.getRole())) {
+            throw new ForbiddenException("Fitur ini hanya untuk student atau champion.");
+        }
         return access;
     }
 

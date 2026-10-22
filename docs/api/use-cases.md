@@ -6,7 +6,7 @@ Endpoints for the project's curated library, assignments, submissions, and guide
 
 ## Guided adoption
 
-All endpoints below are **POST**, use `Authorization: Bearer <active LMS JWT>`, and require the caller's student access. Sessions are private to their owner; another student's session returns 404. Responses use the usual `success`, `code`, `status`, `message`, `data` envelope. The six modal steps are intake, example, current process, workflow preview, execution, and outcome.
+All endpoints below are **POST**, use `Authorization: Bearer <active LMS JWT>`, and require the caller's student or champion access in that project. A champion uses the same learner flow from Mode Student; the guided session belongs to their own access row. Sessions are private to their owner; another user's session returns 404, and sponsors cannot create them. Responses use the usual `success`, `code`, `status`, `message`, `data` envelope. The six modal steps are intake, example, current process, workflow preview, execution, and outcome.
 
 ### `POST {base_url}/api/v1/use-cases/guided/details`
 

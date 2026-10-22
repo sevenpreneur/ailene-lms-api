@@ -47,6 +47,7 @@ class GuidedUseCaseIntegrationTest {
     private UUID student;
     private UUID other;
     private UUID champion;
+    private UUID sponsor;
 
     @BeforeEach
     void setUp() {
@@ -57,11 +58,12 @@ class GuidedUseCaseIntegrationTest {
         student = UUID.randomUUID();
         other = UUID.randomUUID();
         champion = UUID.randomUUID();
+        sponsor = UUID.randomUUID();
         jdbc.update("INSERT INTO lms_projects(id,name) VALUES (?,?)", project, "Guided test project");
         int group = jdbc.queryForObject("INSERT INTO lms_groups(name,project_id) VALUES (?,?) RETURNING id",
                 Integer.class, "Guided test group", project);
         int level = jdbc.queryForObject("SELECT id FROM lms_levels WHERE level_number=3", Integer.class);
-        for (UUID user : List.of(student, other, champion)) {
+        for (UUID user : List.of(student, other, champion, sponsor)) {
             jdbc.update("INSERT INTO lms_users(id,full_name,email,job_title) VALUES (?,?,?,?)",
                     user, "Guided test", user + "@example.invalid", "Test");
         }
@@ -71,9 +73,12 @@ class GuidedUseCaseIntegrationTest {
                 NanoId.generate(), project, other, group, level);
         jdbc.update("INSERT INTO lms_accesses(id,project_id,user_id,group_id,current_level_id,role) VALUES (?,?,?,?,?,'champion')",
                 championAccess, project, champion, group, level);
+        jdbc.update("INSERT INTO lms_accesses(id,project_id,user_id,group_id,current_level_id,role) VALUES (?,?,?,?,?,'sponsor')",
+                NanoId.generate(), project, sponsor, group, level);
         when(auth.resolveUserId("student")).thenReturn(student);
         when(auth.resolveUserId("other")).thenReturn(other);
         when(auth.resolveUserId("champion")).thenReturn(champion);
+        when(auth.resolveUserId("sponsor")).thenReturn(sponsor);
         when(deepSeek.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn(workflow());
     }
 
@@ -95,7 +100,11 @@ class GuidedUseCaseIntegrationTest {
     }
 
     private JsonNode ready() throws Exception {
-        return call("student", "save", Map.of("project_id", project, "current_step", 4,
+        return ready("student");
+    }
+
+    private JsonNode ready(String token) throws Exception {
+        return call(token, "save", Map.of("project_id", project, "current_step", 4,
                 "daily_task", "Saya merekap laporan penjualan mingguan dari beberapa cabang.",
                 "frequency", "weekly", "example_text", "Cabang A: target 50 juta, realisasi 45 juta.",
                 "sensitive_data_confirmed", true, "minutes_without_ai", 90,
@@ -108,13 +117,18 @@ class GuidedUseCaseIntegrationTest {
     }
 
     private JsonNode complete() throws Exception {
-        JsonNode generated = generated();
-        int id = generated.get("id").asInt();
-        call("student", "save", Map.of("session_id", id, "current_step", 5));
+        return complete("student");
+    }
+
+    private JsonNode complete(String token) throws Exception {
+        JsonNode draft = ready(token);
+        int id = draft.get("id").asInt();
+        JsonNode generated = call(token, "generate", Map.of("session_id", id));
+        call(token, "save", Map.of("session_id", id, "current_step", 5));
         for (JsonNode step : generated.get("steps")) {
-            call("student", "check", Map.of("session_id", id, "step_id", step.get("id").asInt(), "is_done", true));
+            call(token, "check", Map.of("session_id", id, "step_id", step.get("id").asInt(), "is_done", true));
         }
-        return call("student", "save", Map.of("session_id", id, "current_step", 6));
+        return call(token, "save", Map.of("session_id", id, "current_step", 6));
     }
 
     private Map<String, Object> outcome(int id) {
@@ -138,7 +152,7 @@ class GuidedUseCaseIntegrationTest {
     }
 
     @Test
-    void anotherStudentCannotReadOrChangeSessionAndChampionCannotCreate() throws Exception {
+    void anotherUserCannotReadOrChangeStudentSessionAndSponsorCannotCreate() throws Exception {
         int id = ready().get("id").asInt();
         for (String endpoint : List.of("details", "save", "generate")) {
             Map<String, Object> body = endpoint.equals("save")
@@ -147,9 +161,28 @@ class GuidedUseCaseIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
                     .andExpect(status().isNotFound());
         }
-        mvc.perform(post("/api/v1/use-cases/guided/save").header("Authorization", "Bearer champion")
+        mvc.perform(post("/api/v1/use-cases/guided/save").header("Authorization", "Bearer sponsor")
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(
                         Map.of("project_id", project, "current_step", 1)))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void championCanCompleteOwnGuidedUseCaseInStudentModeWithoutSharingDraft() throws Exception {
+        int id = complete("champion").get("id").asInt();
+        assertThat(call("champion", "details", Map.of("project_id", project)).get("id").asInt()).isEqualTo(id);
+        assertThat(call("champion", "details", Map.of("session_id", id)).get("current_step").asInt()).isEqualTo(6);
+        mvc.perform(post("/api/v1/use-cases/guided/details").header("Authorization", "Bearer student")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("session_id", id))))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/use-cases/guided/details").header("Authorization", "Bearer sponsor")
+                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("session_id", id))))
+                .andExpect(status().isNotFound());
+        JsonNode submitted = call("champion", "submit", outcome(id));
+        assertThat(submitted.get("submission_status").asString()).isEqualTo("awaiting_review");
+        assertThat(jdbc.queryForObject("SELECT student_access_id FROM lms_use_case_submissions WHERE guided_session_id=?",
+                String.class, id)).isEqualTo(championAccess);
+        assertThat(call("champion", "submit", outcome(id)).get("submission_id").asInt())
+                .isEqualTo(submitted.get("submission_id").asInt());
     }
 
     @Test
