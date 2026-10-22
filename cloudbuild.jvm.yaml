@@ -1,0 +1,12 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - Dockerfile.jvm
+      - --tag
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/ailene/lms:temporary-jvm
+      - .
+images:
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/ailene/lms:temporary-jvm
+timeout: 1800s
