@@ -93,7 +93,7 @@ class GuidedUseCaseNativeSmokeTest {
             int sessionId = draft.get("id").asInt();
             JsonNode generated = call("use-cases/guided/generate", studentToken, Map.of("session_id", sessionId));
             assertThat(generated.get("steps").size()).isBetween(3, 7);
-            assertThat(generated.get("regenerate_remaining").asInt()).isEqualTo(2);
+            assertThat(generated.get("regenerate_remaining").isNull()).isTrue();
             assertThat(generated.get("is_generating").asBoolean()).isFalse();
             call("use-cases/guided/save", studentToken, Map.of("session_id", sessionId, "current_step", 5));
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {

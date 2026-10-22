@@ -12,21 +12,47 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class GuidedUseCaseStoreAccessTest {
     @Mock private GuidedSessionRepository sessions;
     @Mock private AccessRepository accesses;
+    @Mock private GuidedJson json;
     @InjectMocks private GuidedUseCaseStore store;
 
     private final UUID userId = UUID.randomUUID();
     private static final String PROJECT_ID = "test-project";
+
+    @Test
+    void fourthGenerationIsAllowedAndStillGetsANewAuditVersion() {
+        GuidedSession session = new GuidedSession();
+        session.setId(7);
+        session.setGenerationsUsed(3);
+        session.setDailyTask("Saya merekap laporan penjualan dari seluruh cabang setiap minggu.");
+        session.setFrequency(UseCaseFrequency.weekly);
+        session.setExampleText("Cabang A: 40 unit, cabang B: 30 unit.");
+        session.setSensitiveDataConfirmed(true);
+        session.setMinutesWithoutAi(BigDecimal.valueOf(90));
+        session.setCurrentProcess("Gabungkan data cabang, lalu periksa jumlahnya.");
+        when(sessions.lockOwned(eq(7), eq(userId), anyList())).thenReturn(Optional.of(session));
+        when(json.steps(session.getStepsJson())).thenReturn(List.of());
+
+        var reservation = store.reserve(userId, new GuidedGenerateRequest(7, "Gunakan Copilot."));
+
+        assertThat(reservation.session().getGenerationsUsed()).isEqualTo(4);
+        assertThat(reservation.token()).isNotBlank();
+        verify(sessions).saveAndFlush(session);
+    }
 
     @Test
     void championCanOpenOwnStudentModeDraftLookup() {

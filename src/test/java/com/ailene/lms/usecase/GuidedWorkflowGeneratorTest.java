@@ -46,32 +46,32 @@ class GuidedWorkflowGeneratorTest {
 
     @Test
     void retriesInvalidJsonOnceAndDoesNotTrustModelCompletionFields() {
-        when(client.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble()))
+        when(client.createJsonCompletion(anyString(), anyString(), isNull(), anyDouble()))
                 .thenReturn("invalid", workflow());
         GuidedSession session = new GuidedSession();
         session.setGenerationsUsed(1);
         session.setDailyTask("Rekap laporan mingguan dari beberapa cabang.");
         session.setMinutesWithoutAi(BigDecimal.valueOf(90));
         assertThat(generator.generate(session, null).steps()).hasSize(3);
-        verify(client, times(2)).createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble());
+        verify(client, times(2)).createJsonCompletion(anyString(), anyString(), isNull(), anyDouble());
     }
 
     @Test
     void regenerationIncludesPreviousWorkflowAlongsideFeedback() {
-        when(client.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn(workflow());
+        when(client.createJsonCompletion(anyString(), anyString(), isNull(), anyDouble())).thenReturn(workflow());
         GuidedSession session = new GuidedSession();
         session.setGenerationsUsed(2);
         session.setStepsJson(new GuidedJson(mapper).write(generator.parse(workflow(), 1).steps()));
         generator.generate(session, "Perbaiki langkah kedua.");
         verify(client).createJsonCompletion(anyString(), argThat(input ->
                 input.contains("previous_workflow") && input.contains("Buat ringkasan")
-                        && input.contains("Perbaiki langkah kedua.")), anyInt(), anyDouble());
+                        && input.contains("Perbaiki langkah kedua.")), isNull(), anyDouble());
     }
 
     @Test
     void returnsBadGatewayAfterTwoInvalidResults() {
-        when(client.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn("{}");
+        when(client.createJsonCompletion(anyString(), anyString(), isNull(), anyDouble())).thenReturn("{}");
         assertThatThrownBy(() -> generator.generate(new GuidedSession(), null)).isInstanceOf(BadGatewayException.class);
-        verify(client, times(2)).createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble());
+        verify(client, times(2)).createJsonCompletion(anyString(), anyString(), isNull(), anyDouble());
     }
 }

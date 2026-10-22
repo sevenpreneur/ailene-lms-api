@@ -8,7 +8,7 @@ public record GuidedSessionResponse(Integer id, Integer useCaseId, String projec
         int currentStep, String dailyTask, UseCaseFrequency frequency, String exampleText, String exampleFileUrl,
         boolean sensitiveDataConfirmed, BigDecimal minutesWithoutAi, String currentProcess,
         List<String> currentTools, String painPoint, List<GuidedStep> steps, String summary,
-        Integer estimatedMinutesWithAi, List<String> risks, int regenerateRemaining, boolean isGenerating,
+        Integer estimatedMinutesWithAi, List<String> risks, Integer regenerateRemaining, boolean isGenerating,
         OffsetDateTime createdAt, OffsetDateTime updatedAt) {
     public static GuidedSessionResponse from(GuidedSession s, GuidedJson json) {
         return new GuidedSessionResponse(s.getId(), s.getUseCaseId(), s.getProjectId(), s.getStatus(),
@@ -16,7 +16,7 @@ public record GuidedSessionResponse(Integer id, Integer useCaseId, String projec
                 s.isSensitiveDataConfirmed(), s.getMinutesWithoutAi(), s.getCurrentProcess(),
                 json.strings(s.getCurrentToolsJson()), s.getPainPoint(), json.steps(s.getStepsJson()), s.getSummary(),
                 s.getEstimatedMinutesWithAi(), json.strings(s.getRisksJson()),
-                Math.max(0, GuidedUseCaseStore.MAX_GENERATIONS - s.getGenerationsUsed()),
+                null,
                 GuidedRules.generating(s), s.getCreatedAt(), s.getUpdatedAt());
     }
 }

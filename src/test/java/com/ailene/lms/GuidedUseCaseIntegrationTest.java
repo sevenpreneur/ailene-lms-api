@@ -79,7 +79,7 @@ class GuidedUseCaseIntegrationTest {
         when(auth.resolveUserId("other")).thenReturn(other);
         when(auth.resolveUserId("champion")).thenReturn(champion);
         when(auth.resolveUserId("sponsor")).thenReturn(sponsor);
-        when(deepSeek.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn(workflow());
+        when(deepSeek.createJsonCompletion(anyString(), anyString(), isNull(), anyDouble())).thenReturn(workflow());
     }
 
     private String workflow() {
@@ -147,7 +147,7 @@ class GuidedUseCaseIntegrationTest {
         JsonNode resumed = call("student", "details", Map.of("project_id", project));
         assertThat(resumed.get("current_step").asInt()).isEqualTo(2);
         assertThat(resumed.get("created_at").asString()).isNotBlank();
-        assertThat(resumed.get("regenerate_remaining").asInt()).isEqualTo(3);
+        assertThat(resumed.get("regenerate_remaining").isNull()).isTrue();
         verifyNoInteractions(deepSeek);
     }
 
@@ -186,11 +186,11 @@ class GuidedUseCaseIntegrationTest {
     }
 
     @Test
-    void generationReservesQuotaAuditsVersionsAndRejectsStaleChecklistIds() throws Exception {
+    void generationHasNoQuotaAuditsVersionsAndRejectsStaleChecklistIds() throws Exception {
         JsonNode first = generated();
         int id = first.get("id").asInt();
         int oldStep = first.get("steps").get(0).get("id").asInt();
-        assertThat(first.get("regenerate_remaining").asInt()).isEqualTo(2);
+        assertThat(first.get("regenerate_remaining").isNull()).isTrue();
         JsonNode second = call("student", "generate", Map.of("session_id", id, "feedback", "Gunakan Copilot."));
         assertThat(second.get("steps").get(0).get("id").asInt()).isNotEqualTo(oldStep);
         call("student", "save", Map.of("session_id", id, "current_step", 5));
@@ -198,29 +198,27 @@ class GuidedUseCaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(
                         Map.of("session_id", id, "step_id", oldStep, "is_done", true)))).andExpect(status().isNotFound());
         call("student", "generate", Map.of("session_id", id));
-        mvc.perform(post("/api/v1/use-cases/guided/generate").header("Authorization", "Bearer student")
-                .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("session_id", id))))
-                .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.status").value("TOO_MANY_REQUESTS"));
+        call("student", "generate", Map.of("session_id", id));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM lms_guided_use_case_generations WHERE session_id=?", Integer.class, id))
-                .isEqualTo(3);
+                .isEqualTo(4);
         mvc.perform(post("/api/v1/use-cases/guided/save").header("Authorization", "Bearer student")
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of(
                         "session_id", id, "current_step", 2, "daily_task", "Saya menyiapkan pekerjaan lain dengan konteks berbeda."))))
-                .andExpect(status().isConflict());
+                .andExpect(status().isOk());
         entityManager.clear();
-        assertThat(call("student", "details", Map.of("session_id", id)).get("steps").size()).isEqualTo(3);
+        assertThat(call("student", "details", Map.of("session_id", id)).get("steps").size()).isZero();
     }
 
     @Test
     void invalidAiOutputReleasesReservationWithoutLosingPreviousWorkflow() throws Exception {
         JsonNode generated = generated();
         int id = generated.get("id").asInt();
-        when(deepSeek.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble())).thenReturn("{}");
+        when(deepSeek.createJsonCompletion(anyString(), anyString(), isNull(), anyDouble())).thenReturn("{}");
         mvc.perform(post("/api/v1/use-cases/guided/generate").header("Authorization", "Bearer student")
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("session_id", id))))
                 .andExpect(status().isBadGateway());
         JsonNode session = call("student", "details", Map.of("session_id", id));
-        assertThat(session.get("regenerate_remaining").asInt()).isEqualTo(2);
+        assertThat(session.get("regenerate_remaining").isNull()).isTrue();
         assertThat(session.get("is_generating").asBoolean()).isFalse();
         assertThat(session.get("steps")).isEqualTo(generated.get("steps"));
     }
@@ -233,7 +231,7 @@ class GuidedUseCaseIntegrationTest {
         assertThat(changed.get("sensitive_data_confirmed").asBoolean()).isFalse();
         assertThat(changed.get("steps").size()).isZero();
         assertThat(changed.get("status").asString()).isEqualTo("intake");
-        assertThat(changed.get("regenerate_remaining").asInt()).isEqualTo(2);
+        assertThat(changed.get("regenerate_remaining").isNull()).isTrue();
     }
 
     @Test
@@ -357,13 +355,13 @@ class GuidedUseCaseIntegrationTest {
                 NanoId.generate(), id);
         entityManager.clear();
         assertThat(call("student", "details", Map.of("session_id", id)).get("is_generating").asBoolean()).isFalse();
-        when(deepSeek.createJsonCompletion(anyString(), anyString(), anyInt(), anyDouble()))
+        when(deepSeek.createJsonCompletion(anyString(), anyString(), isNull(), anyDouble()))
                 .thenThrow(new com.ailene.lms.common.exception.ServiceUnavailableException("AI unavailable"));
         mvc.perform(post("/api/v1/use-cases/guided/generate").header("Authorization", "Bearer student")
                 .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(Map.of("session_id", id))))
                 .andExpect(status().isServiceUnavailable());
         JsonNode latest = call("student", "details", Map.of("session_id", id));
-        assertThat(latest.get("regenerate_remaining").asInt()).isEqualTo(2);
+        assertThat(latest.get("regenerate_remaining").isNull()).isTrue();
         assertThat(latest.get("is_generating").asBoolean()).isFalse();
     }
 

@@ -6,7 +6,7 @@ Endpoints for the project's curated library, assignments, submissions, and guide
 
 ## Guided adoption
 
-All endpoints below are **POST**, use `Authorization: Bearer <active LMS JWT>`, and require the caller's student or champion access in that project. A champion uses the same learner flow from Mode Student; the guided session belongs to their own access row. Sessions are private to their owner; another user's session returns 404, and sponsors cannot create them. Responses use the usual `success`, `code`, `status`, `message`, `data` envelope. The six modal steps are intake, example, current process, workflow preview, execution, and outcome.
+All endpoints below are **POST**, use `Authorization: Bearer <active LMS JWT>`, and require the caller's student or champion access in that project. A champion uses the same learner flow from Mode Student; the guided session belongs to their own access row. Sessions are private to their owner; another user's session returns 404, and sponsors cannot create them. Responses use the usual `success`, `code`, `status`, `message`, `data` envelope. The six guided steps are intake, example, current process, Saran Workflow (step 4), execution, and outcome.
 
 ### `POST {base_url}/api/v1/use-cases/guided/details`
 
@@ -49,14 +49,14 @@ The session shape returned by `details`, `save`, and `generate` is:
   "summary": "Rekap laporan dengan pemeriksaan angka.",
   "estimated_minutes_with_ai": 35,
   "risks": ["Cocokkan angka dengan sumber."],
-  "regenerate_remaining": 2,
+  "regenerate_remaining": null,
   "is_generating": false,
   "created_at": "2026-10-20T10:00:00Z",
   "updated_at": "2026-10-20T10:01:00Z"
 }
 ```
 
-The example truncates `steps`; a generated workflow contains 3–7 steps. Statuses are `intake`, `steps_ready`, `in_progress`, `ready_to_submit`, and `submitted`. `is_generating` is true only while a generation lease is active (five minutes). `regenerate_remaining` counts all available generations, including the first, from a total allowance of three.
+The example truncates `steps`; a generated workflow contains 3–7 steps. Statuses are `intake`, `steps_ready`, `in_progress`, `ready_to_submit`, and `submitted`. `is_generating` is true only while a generation lease is active (five minutes). `regenerate_remaining` is retained for compatibility and is `null`: there is no per-session generation quota.
 
 ### `POST {base_url}/api/v1/use-cases/guided/save`
 
@@ -79,17 +79,21 @@ Upserts a draft and persists navigation. For a new personal draft, provide `proj
 
 `current_step` is always required (1–6). Other fields are partial updates: omitted or `null` leaves a value unchanged; an empty string clears optional text/file fields, and `[]` clears tools. Limits: `daily_task` 3000 characters, `example_text` 10000, file URL 500, `current_process` 5000, `pain_point` 2000, and up to 20 nonblank tools of 100 characters each. Minutes must be positive, at most 599999.40, with at most two decimals. Frequency uses the existing `daily`, `weekly`, `monthly` enum.
 
-Navigation validates all preceding steps: step 2 needs a task of at least 30 trimmed characters and frequency; step 3 needs an example plus sensitive-data confirmation; step 4 needs baseline minutes and current process; step 5 needs a generated workflow; step 6 needs every step completed or explicitly skipped. Saving step 5 accepts the preview and enables the checklist.
+Navigation validates all preceding steps: step 2 needs a task of at least 30 trimmed characters and frequency; step 3 needs an example plus sensitive-data confirmation; step 4 needs baseline minutes and current process; step 5 needs a generated workflow; step 6 needs every step completed or explicitly skipped. Saving step 5 accepts Saran Workflow and enables the checklist.
 
-Changing intake invalidates the generated workflow and checklist, retaining generation audit history and quota. Changing either example field resets confirmation unless `sensitive_data_confirmed: true` is sent in that request. When the generation allowance is exhausted, edits that would invalidate the existing workflow return 409, preserving the usable workflow. Submitted intake is immutable.
+Changing intake invalidates the generated workflow and checklist, retaining generation audit history. Changing either example field resets confirmation unless `sensitive_data_confirmed: true` is sent in that request. Submitted intake is immutable.
+
+Navigation on steps 4–6 should send only `session_id` and `current_step`, without resending intake fields. If a client does resend answers, equivalent decimal values (`90` and `90.00`) and JSON whitespace in the tools list are not intake changes and must preserve the workflow.
 
 **Files:** `example_file_url` accepts HTTPS URLs whose paths end in PDF, DOCX, XLSX, CSV, PNG, JPG, or JPEG (query parameters are allowed). Upload uses the existing client/storage flow. This API never downloads the URL or extracts its contents. Before generation, also supply anonymized contents or a summary in `example_text`; a file-only example can be saved but cannot generate a workflow.
 
 ### `POST {base_url}/api/v1/use-cases/guided/generate`
 
-Request: `{ "session_id": 1, "feedback": "Gunakan Copilot untuk langkah ringkasan." }`. Feedback is optional, max 2000 characters. Returns the updated session with a 3–7 step workflow in Indonesian, reusable prompts, verification checks, risks, and estimated duration. It returns to preview (step 4); accept with `save` step 5 before execution. Regeneration replaces the checklist and step ids, so clients must replace their cached steps.
+Request: `{ "session_id": 1, "feedback": "Gunakan Copilot untuk langkah ringkasan." }`. Feedback is optional, max 2000 characters. Returns the updated session with a 3–7 step workflow in Indonesian, reusable prompts, verification checks, risks, and estimated duration. It returns to Saran Workflow (step 4); accept with `save` step 5 before execution. Regeneration replaces the checklist and step ids, so clients must replace their cached steps.
 
-The backend reuses DeepSeek's configured client. It reserves an attempt under a row lock, calls AI outside the database transaction, validates JSON/schema, retries malformed output once, and saves the workflow and audit record atomically. There are three successful generations per session. Provider or validation failures release the attempt and preserve the previous workflow. A process interruption leaves a five-minute lease; after expiry another request can retry, with that interrupted attempt still counted. Mutations during an active generation return 409. Do not automatically retry generation on a request timeout: first resume the session.
+The generation prompt asks DeepSeek to redesign the process for the fewest practical steps, use AI for useful processing tasks, and minimize tool switching and repeated data entry. Each step identifies its input and output so the following step can reuse it, preferably in the same AI conversation or document. Manual work is retained for privacy, source verification, approval, or actions that are faster without AI. Estimates are requested to include preparation, handoffs, verification, and finalization, with the total matching the step estimates. These are generation instructions, not an additional semantic validator or a guarantee of efficiency; the participant still verifies the suggestions before execution.
+
+The backend reuses DeepSeek's configured client. It reserves an attempt under a row lock, calls AI outside the database transaction, validates JSON/schema, retries malformed output once, and saves the workflow and audit record atomically. There is no per-session generation quota. Guided workflow calls omit `max_tokens`, using the [provider's default output allowance](https://api-docs.deepseek.com/api/create-chat-completion/) instead of an application-specific cap. Provider or validation failures release the attempt and preserve the previous workflow. A process interruption leaves a five-minute lease; after expiry another request can retry, with that interrupted attempt still recorded. Mutations during an active generation return 409. Do not automatically retry generation on a request timeout: first resume the session.
 
 ### `POST {base_url}/api/v1/use-cases/guided/check`
 
@@ -146,7 +150,6 @@ Retries are idempotent: pending/accepted submissions return the existing result 
 | 403 | Project access is not a student |
 | 404 | Session/access/use case not found, another student's session, or stale workflow step |
 | 409 | Generation in progress, submitted intake edit, exhausted-quota intake edit, or conflicting session/submission |
-| 429 | Three workflow generations already used (`TOO_MANY_REQUESTS`) |
 | 502 | AI provider failed or returned unusable output after validation/retry |
 | 503 | `DEEPSEEK_API_KEY` unavailable |
 
@@ -154,7 +157,7 @@ Text checks catch recognizable NIK/account/salary patterns and lists of emails/p
 
 ### Verification
 
-`GuidedRulesTest` and `GuidedWorkflowGeneratorTest` cover validation, savings, schema retries, and regeneration context. `GuidedUseCaseIntegrationTest` uses a real isolated PostgreSQL branch, mocked auth/AI, and transaction rollbacks to cover persistence, authorization, quota/audits, recovery, submission idempotency, Champion details, and revision through the legacy endpoint. Set `DB_URL` to the test branch before running `./mvnw test`; Spring-context tests apply Flyway migrations.
+`GuidedRulesTest` and `GuidedWorkflowGeneratorTest` cover validation, savings, schema retries, and regeneration context. `GuidedUseCaseStoreAccessTest` verifies learner access and generation beyond the former three-attempt cap. `GuidedUseCaseIntegrationTest` uses a real isolated PostgreSQL branch, mocked auth/AI, and transaction rollbacks to cover persistence, authorization, unlimited regeneration with versioned audits, recovery, submission idempotency, Champion details, and revision through the legacy endpoint. Set `DB_URL` to the test branch before running `./mvnw test`; Spring-context tests apply Flyway migrations.
 
 `GuidedUseCaseNativeSmokeTest` is opt-in. Start the native Docker image locally with the same isolated database and runtime secrets (including `DEEPSEEK_API_KEY`), then run `./mvnw test -Dtest=GuidedUseCaseNativeSmokeTest -Dguided.native.base-url=http://127.0.0.1:18080` with that branch's explicit `DB_URL`. It uses real JWTs and one real AI generation with synthetic data, checks concurrent checklist updates and idempotent submission, reads Champion details, then removes its own fixtures. Do not point the test or container at production.
 

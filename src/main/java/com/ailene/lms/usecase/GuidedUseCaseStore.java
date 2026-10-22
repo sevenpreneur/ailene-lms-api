@@ -24,7 +24,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class GuidedUseCaseStore {
-    public static final int MAX_GENERATIONS = 3;
     private static final List<AccessRole> LEARNER_ROLES = List.of(AccessRole.student, AccessRole.champion);
     private final GuidedSessionRepository sessions;
     private final GuidedGenerationRepository generations;
@@ -102,9 +101,6 @@ public class GuidedUseCaseStore {
         GuidedRules.requireSafe(s.getDailyTask(), s.getExampleText(), s.getCurrentProcess(), s.getPainPoint(),
                 String.join(", ", json.strings(s.getCurrentToolsJson())));
         if (!before.equals(intakeSnapshot(s))) {
-            if (s.getGenerationsUsed() >= MAX_GENERATIONS && !json.steps(s.getStepsJson()).isEmpty()) {
-                throw new ConflictException("Kuota generate sudah habis. Lanjutkan dengan workflow yang tersedia.");
-            }
             s.setStepsJson("[]");
             s.setSummary(null);
             s.setRisksJson("[]");
@@ -168,9 +164,6 @@ public class GuidedUseCaseStore {
             throw new BadRequestException("Tambahkan teks atau ringkasan isi file yang sudah disamarkan sebelum membuat workflow.");
         }
         GuidedRules.requireSafe(s.getDailyTask(), s.getExampleText(), s.getCurrentProcess(), s.getPainPoint(), r.feedback());
-        if (s.getGenerationsUsed() >= MAX_GENERATIONS) {
-            throw new TooManyRequestsException("Kuota generate workflow untuk sesi ini sudah habis.");
-        }
         s.setGenerationToken(NanoId.generate());
         s.setGenerationStartedAt(OffsetDateTime.now());
         s.setGenerationsUsed(s.getGenerationsUsed() + 1);
@@ -394,8 +387,9 @@ public class GuidedUseCaseStore {
 
     private String intakeSnapshot(GuidedSession s) {
         return json.write(java.util.Arrays.asList(s.getDailyTask(), s.getFrequency(), s.getExampleText(),
-                s.getExampleFileUrl(), s.isSensitiveDataConfirmed(), s.getMinutesWithoutAi(),
-                s.getCurrentProcess(), s.getCurrentToolsJson(), s.getPainPoint()));
+                s.getExampleFileUrl(), s.isSensitiveDataConfirmed(),
+                s.getMinutesWithoutAi() == null ? null : s.getMinutesWithoutAi().stripTrailingZeros(),
+                s.getCurrentProcess(), json.strings(s.getCurrentToolsJson()), s.getPainPoint()));
     }
 
     private void mutable(GuidedSession s) {
